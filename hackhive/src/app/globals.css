@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --hive-yellow: #ffda3d;
+  --hive-yellow-dark: #eab900;
+  --hive-cream: #fffdf5;
+  --hive-black: #080808;
+  --hive-grey: #777777;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  background: var(--hive-cream);
+  color: var(--hive-black);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--hive-yellow);
+  color: black;
+}
+
+/* Heading font */
+
+.hive-heading {
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  letter-spacing: -1px;
+  font-weight: 900;
+}
+
+/* Honeycomb background */
+
+.honeycomb-bg {
+  background-color: var(--hive-yellow);
+  background-image: url("data:image/svg+xml,%3Csvg width='48' height='42' viewBox='0 0 48 42' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 0L24 7L24 21L12 28L0 21L0 7Z' fill='%23e9bd23' fill-opacity='.35'/%3E%3Cpath d='M36 21L48 28L48 42L36 49L24 42L24 28Z' fill='%23e9bd23' fill-opacity='.35'/%3E%3C/svg%3E");
+}
+
+/* Buttons */
+
+.hive-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--hive-yellow);
+  color: black;
+  border: 1.5px solid black;
+  border-radius: 11px;
+  padding: 13px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 3px 4px 0 black;
+  transition: all 0.2s ease;
+}
+
+.hive-button:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: 4px 6px 0 black;
+}
+
+.hive-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.hive-button-black {
+  background: black;
+  color: white;
+}
+
+/* Inputs */
+
+.hive-input {
+  width: 100%;
+  border: 1.4px solid black;
+  background: white;
+  border-radius: 10px;
+  padding: 12px 14px;
+  outline: none;
+  font-size: 13px;
+  transition: box-shadow 0.2s;
+}
+
+.hive-input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 218, 61, 0.6);
+}
+
+.hive-input::placeholder {
+  color: #999;
+}
+
+.hive-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.hive-card {
+  background: white;
+  border: 1px solid #e5e1d6;
+  border-radius: 16px;
+}
+
+/* Scrollbar */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d5bd62;
+  border-radius: 10px;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+  .hive-heading {
+    letter-spacing: -0.5px;
+  }
 }
