@@ -20,10 +20,14 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
+  const handleLogout = async () => {
+  try {
+    await logout();
+    router.replace("/");
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+};
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/10 bg-[#fffdf5]/95 backdrop-blur">

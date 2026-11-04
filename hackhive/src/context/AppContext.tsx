@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -9,190 +10,175 @@ import {
 } from "react";
 
 import type { User } from "@/types/user";
-
-interface SignupData {
-  fullName: string;
-  university: string;
-  location: string;
-  skills: string[];
-  interests: string[];
-  githubOrPortfolio: string;
-  profilePicture: string;
-  email: string;
-}
+import { createClient } from "@/lib/supabase/client";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface AppContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => UserRoleResult;
-  signup: (data: SignupData, password: string) => User;
-  logout: () => void;
-  updateProfile: (data: Partial<User>) => void;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
 }
-
-type UserRoleResult = "user" | "admin" | null;
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const STORAGE_KEY = "hackhive_user";
-const ACCOUNTS_KEY = "hackhive_accounts";
-
-interface StoredAccount {
-  user: User;
-  password: string;
-}
-
-const studentDemo: StoredAccount = {
-  user: {
-    id: "student-demo",
-    role: "user",
-    fullName: "Riya Sharma",
-    email: "riya@hackhive.dev",
-    university: "ABC University",
-    location: "Bengaluru, India",
-    bio: "Passionate developer who loves building meaningful products.",
-    skills: ["React", "Python", "Figma"],
-    interests: ["Web Development", "UI/UX", "AI"],
-    githubOrPortfolio: "https://github.com",
-    profilePicture: "",
-  },
-  password: "demo1234",
-};
-
-const adminDemo: StoredAccount = {
-  user: {
-    id: "admin-demo",
-    role: "admin",
-    fullName: "HackHive Admin",
-    email: "admin@hackhive.dev",
-    university: "",
-    location: "",
-    bio: "",
-    skills: [],
-    interests: [],
-    githubOrPortfolio: "",
-    profilePicture: "",
-  },
-  password: "admin1234",
-};
-
-function getAccounts(): StoredAccount[] {
-  try {
-    const stored = localStorage.getItem(ACCOUNTS_KEY);
-    const accounts = stored ? JSON.parse(stored) : [];
-
-    return [
-      studentDemo,
-      adminDemo,
-      ...(Array.isArray(accounts) ? accounts : []),
-    ];
-  } catch {
-    return [studentDemo, adminDemo];
-  }
-}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+  const supabase = createClient();
 
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+  // Fetch the authenticated user's profile from Supabase.
+  const fetchUserProfile = async (
+    authUser: SupabaseUser
+  ): Promise<User> => {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching profile:", error.message);
+      throw error;
     }
 
-    setLoading(false);
+    return {
+      id: authUser.id,
+      role: "user",
+      fullName:
+        profile?.full_name ||
+        authUser.user_metadata?.full_name ||
+        authUser.user_metadata?.name ||
+        "",
+      email: authUser.email || "",
+      university: profile?.university || "",
+      location: profile?.location || "",
+      bio: profile?.bio || "",
+      skills: profile?.skills || [],
+      interests: profile?.interests || [],
+      githubOrPortfolio: profile?.github_url || "",
+      profilePicture: profile?.avatar_url || "",
+    };
+  };
+
+  // Listen for Supabase login, logout and session changes.
+  useEffect(() => {
+    let mounted = true;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Defer the database request until after the auth callback.
+      Promise.resolve().then(async () => {
+        try {
+          const appUser = await fetchUserProfile(session.user);
+
+          if (mounted) {
+            setUser(appUser);
+          }
+        } catch (error) {
+          console.error("Could not load user profile:", error);
+
+          if (mounted) {
+            setUser(null);
+          }
+        } finally {
+          if (mounted) {
+            setLoading(false);
+          }
+        }
+      });
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = (email: string, password: string): UserRoleResult => {
-    const account = getAccounts().find(
-      (item) =>
-        item.user.email.toLowerCase() === email.trim().toLowerCase() &&
-        item.password === password
-    );
+  // Sign out from Supabase.
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
 
-    if (!account) return null;
-
-    setUser(account.user);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(account.user));
-
-    return account.user.role;
-  };
-
-  const signup = (data: SignupData, password: string): User => {
-    const accounts = getAccounts();
-
-    const existing = accounts.some(
-      (account) =>
-        account.user.email.toLowerCase() === data.email.trim().toLowerCase()
-    );
-
-    if (existing) {
-      throw new Error("An account with this email already exists.");
+    if (error) {
+      throw error;
     }
 
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      role: "user",
-      fullName: data.fullName,
-      email: data.email,
-      university: data.university,
-      location: data.location,
-      bio: "",
-      skills: data.skills,
-      interests: data.interests,
-      githubOrPortfolio: data.githubOrPortfolio,
-      profilePicture: data.profilePicture,
+    setUser(null);
+  };
+
+  // Update the authenticated user's profile in Supabase.
+  const updateProfile = async (data: Partial<User>) => {
+    if (!user) {
+      throw new Error("You must be logged in to update your profile.");
+    }
+
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
     };
 
-    const updatedAccounts = [
-      ...accounts.filter(
-        (account) =>
-          account.user.id !== studentDemo.user.id &&
-          account.user.id !== adminDemo.user.id
-      ),
-      { user: newUser, password },
-    ];
+    if (data.fullName !== undefined) {
+      updates.full_name = data.fullName;
+    }
 
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+    if (data.university !== undefined) {
+      updates.university = data.university;
+    }
 
-    setUser(newUser);
+    if (data.location !== undefined) {
+      updates.location = data.location;
+    }
 
-    return newUser;
-  };
+    if (data.bio !== undefined) {
+      updates.bio = data.bio;
+    }
 
-  const updateProfile = (data: Partial<User>) => {
-    if (!user) return;
+    if (data.skills !== undefined) {
+      updates.skills = data.skills;
+    }
 
-    const updatedUser = { ...user, ...data, role: user.role };
+    if (data.interests !== undefined) {
+      updates.interests = data.interests;
+    }
 
-    setUser(updatedUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    if (data.githubOrPortfolio !== undefined) {
+      updates.github_url = data.githubOrPortfolio;
+    }
 
-    const accounts = getAccounts().filter(
-      (account) =>
-        account.user.id !== studentDemo.user.id &&
-        account.user.id !== adminDemo.user.id
-    );
+    if (data.profilePicture !== undefined) {
+      updates.avatar_url = data.profilePicture;
+    }
 
-    const updatedAccounts = accounts.map((account) =>
-      account.user.id === updatedUser.id
-        ? { ...account, user: updatedUser }
-        : account
-    );
+    const { data: updatedProfile, error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id)
+      .select()
+      .single();
 
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-  };
+    if (error) {
+      console.error("Profile update error:", error.message);
+      throw error;
+    }
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
+    setUser({
+      ...user,
+      fullName: updatedProfile.full_name || "",
+      university: updatedProfile.university || "",
+      location: updatedProfile.location || "",
+      bio: updatedProfile.bio || "",
+      skills: updatedProfile.skills || [],
+      interests: updatedProfile.interests || [],
+      githubOrPortfolio: updatedProfile.github_url || "",
+      profilePicture: updatedProfile.avatar_url || "",
+    });
   };
 
   return (
@@ -200,8 +186,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
-        login,
-        signup,
         logout,
         updateProfile,
       }}

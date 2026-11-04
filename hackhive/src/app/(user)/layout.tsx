@@ -16,12 +16,10 @@ export default function UserLayout({
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
-    } else if (!loading && user?.role === "admin") {
-      router.replace("/admin");
     }
   }, [user, loading, router]);
 
-  if (loading || !user || user.role !== "user") {
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#fffdf5]">
         <div className="text-center">
