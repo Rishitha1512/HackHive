@@ -1,3 +1,4 @@
+
 export interface Hackathon {
   id: string;
   title: string;
@@ -9,4 +10,9 @@ export interface Hackathon {
   startDate: string;
   endDate: string;
   applicationDeadline: string;
+
+  organizer: string;
+  contactEmail: string;
+  registrationUrl: string;
+  website: string | null;
 }
