@@ -285,7 +285,7 @@ export default function ProfilePage() {
 
           <Link
             href="/hackathons"
-            className="mt-6 flex items-center justify-between rounded-xl bg-black px-4 py-3 text-xs font-bold text-white hover:bg-[#333]"
+            className="mt-6 flex items-center justify-between rounded-xl bg-white px-4 py-3 text-xs font-bold text-white hover:bg-[#ffda3d]"
           >
             Discover teams <ArrowUpRight size={16} />
           </Link>

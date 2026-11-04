@@ -47,8 +47,8 @@ a {
 
 .hive-heading {
   font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-  letter-spacing: -1px;
-  font-weight: 900;
+  letter-spacing: -0.5px;
+  font-weight: 85;
 }
 
 /* Honeycomb background */
