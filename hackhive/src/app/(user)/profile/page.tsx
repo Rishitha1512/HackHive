@@ -1,15 +1,15 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 import {
   ArrowRight,
   ArrowUpRight,
-  BriefcaseBusiness,
   CalendarDays,
-  Check,
   Edit3,
   ExternalLink,
   GraduationCap,
@@ -18,6 +18,7 @@ import {
   Sparkles,
   Trophy,
   X,
+  Pencil,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -44,7 +45,14 @@ const participatedHackathons = [
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth();
 
+  const supabase = createClient();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -54,7 +62,6 @@ export default function ProfilePage() {
     skills: "",
     interests: "",
     githubOrPortfolio: "",
-    profilePicture: "",
   });
 
   useEffect(() => {
@@ -67,12 +74,9 @@ export default function ProfilePage() {
         skills: user.skills.join(", "),
         interests: user.interests.join(", "),
         githubOrPortfolio: user.githubOrPortfolio,
-        profilePicture: user.profilePicture,
       });
     }
   }, [user]);
-
-  if (!user) return null;
 
   const handleChange = (field: string, value: string) => {
     setForm((previous) => ({
@@ -81,26 +85,115 @@ export default function ProfilePage() {
     }));
   };
 
-  const handleSave = () => {
-    updateProfile({
-      fullName: form.fullName.trim(),
-      university: form.university.trim(),
-      location: form.location.trim(),
-      bio: form.bio.trim(),
-      skills: form.skills
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      interests: form.interests
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      githubOrPortfolio: form.githubOrPortfolio.trim(),
-      profilePicture: form.profilePicture.trim(),
-    });
+  // Upload profile picture to Supabase Storage.
+  const handleProfilePictureChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
 
-    setEditing(false);
+    if (!file || !user) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      alert("Please select a JPG, PNG or WEBP image.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size must be less than 2 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+
+    try {
+      setUploadingPicture(true);
+      setPreviewUrl(objectUrl);
+
+      const safeFileName = file.name.replace(
+        /[^a-zA-Z0-9._-]/g,
+        "_"
+      );
+
+      const filePath = `${user.id}/${Date.now()}-${safeFileName}`;
+
+      // Upload image.
+      const { error: uploadError } = await supabase.storage
+        .from("profile-pictures")
+        .upload(filePath, file, {
+          contentType: file.type,
+          cacheControl: "3600",
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public image URL.
+      const { data } = supabase.storage
+        .from("profile-pictures")
+        .getPublicUrl(filePath);
+
+      // Save URL in Supabase profiles table.
+      await updateProfile({
+        profilePicture: data.publicUrl,
+      });
+
+      alert("Profile picture updated successfully!");
+    } catch (error) {
+      console.error("Profile picture upload failed:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not upload profile picture."
+      );
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setPreviewUrl("");
+      setUploadingPicture(false);
+
+      event.target.value = "";
+    }
   };
+
+  // Save other profile information.
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+
+      await updateProfile({
+        fullName: form.fullName.trim(),
+        university: form.university.trim(),
+        location: form.location.trim(),
+        bio: form.bio.trim(),
+        skills: form.skills
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        interests: form.interests
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        githubOrPortfolio: form.githubOrPortfolio.trim(),
+      });
+
+      setEditing(false);
+      alert("Profile updated successfully!");
+    } catch (error) {
+      console.error("Profile update failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not update profile."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) return null;
 
   const completionFields = [
     user.fullName,
@@ -118,6 +211,7 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto max-w-[1280px] px-5 py-8 sm:px-8 lg:py-12">
+
       {/* WELCOME SECTION */}
 
       <section className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -232,39 +326,81 @@ export default function ProfilePage() {
                     skills: user.skills.join(", "),
                     interests: user.interests.join(", "),
                     githubOrPortfolio: user.githubOrPortfolio,
-                    profilePicture: user.profilePicture,
                   });
                   setEditing(false);
                 }}
+                disabled={saving}
                 className="flex items-center gap-2 rounded-lg border border-black bg-white px-3 py-2 text-xs font-bold"
               >
                 <X size={14} /> Cancel
               </button>
 
-              <button onClick={handleSave} className="hive-button">
-                <Save size={14} /> Save changes
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="hive-button disabled:opacity-60"
+              >
+                <Save size={14} />
+                {saving ? "Saving..." : "Save changes"}
               </button>
             </div>
           )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+
           {/* LEFT PROFILE CARD */}
 
           <div className="h-fit rounded-2xl border border-black bg-white p-6">
             <div className="flex flex-col items-center text-center">
-              <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-black bg-[#ffda3d] text-3xl font-black">
-                {user.profilePicture ? (
-                  <Image
-                    src={user.profilePicture}
-                    alt={user.fullName}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
-                ) : (
-                  user.fullName.charAt(0).toUpperCase()
-                )}
+
+              {/* PROFILE PICTURE */}
+
+              <div className="relative h-24 w-24">
+
+                <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-black bg-[#ffda3d] text-3xl font-black">
+
+                  {previewUrl || user.profilePicture ? (
+                    <Image
+                      src={previewUrl || user.profilePicture}
+                      alt={user.fullName}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    user.fullName.charAt(0).toUpperCase()
+                  )}
+
+                </div>
+
+                {/* HIDDEN FILE INPUT */}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleProfilePictureChange}
+                />
+
+                {/* PENCIL BUTTON */}
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPicture}
+                  title="Change profile picture"
+                  aria-label="Change profile picture"
+                  className="absolute -bottom-1 -right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-[#ffda3d] shadow-md transition hover:bg-[#f5c900] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {uploadingPicture ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
+                  ) : (
+                    <Pencil size={14} />
+                  )}
+                </button>
+
               </div>
 
               <h3 className="mt-4 text-xl font-black">
@@ -315,15 +451,14 @@ export default function ProfilePage() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
+
               <div>
                 <label className="hive-label">Full name</label>
                 {editing ? (
                   <input
                     className="hive-input"
                     value={form.fullName}
-                    onChange={(e) =>
-                      handleChange("fullName", e.target.value)
-                    }
+                    onChange={(e) => handleChange("fullName", e.target.value)}
                   />
                 ) : (
                   <p className="text-sm font-semibold">{user.fullName}</p>
@@ -336,9 +471,7 @@ export default function ProfilePage() {
                   <input
                     className="hive-input"
                     value={form.university}
-                    onChange={(e) =>
-                      handleChange("university", e.target.value)
-                    }
+                    onChange={(e) => handleChange("university", e.target.value)}
                   />
                 ) : (
                   <p className="text-sm font-semibold">{user.university}</p>
@@ -351,9 +484,7 @@ export default function ProfilePage() {
                   <input
                     className="hive-input"
                     value={form.location}
-                    onChange={(e) =>
-                      handleChange("location", e.target.value)
-                    }
+                    onChange={(e) => handleChange("location", e.target.value)}
                   />
                 ) : (
                   <p className="text-sm font-semibold">{user.location}</p>
@@ -374,9 +505,7 @@ export default function ProfilePage() {
                     className="hive-input resize-none"
                     placeholder="Tell us about yourself..."
                     value={form.bio}
-                    onChange={(e) =>
-                      handleChange("bio", e.target.value)
-                    }
+                    onChange={(e) => handleChange("bio", e.target.value)}
                   />
                 ) : (
                   <p className="text-sm leading-6 text-gray-600">
@@ -384,21 +513,6 @@ export default function ProfilePage() {
                   </p>
                 )}
               </div>
-
-              {editing && (
-                <div className="sm:col-span-2">
-                  <label className="hive-label">Profile picture URL</label>
-                  <input
-                    type="url"
-                    className="hive-input"
-                    placeholder="https://example.com/photo.jpg"
-                    value={form.profilePicture}
-                    onChange={(e) =>
-                      handleChange("profilePicture", e.target.value)
-                    }
-                  />
-                </div>
-              )}
 
               <div className="sm:col-span-2">
                 <label className="hive-label">GitHub / Portfolio URL</label>
@@ -418,6 +532,7 @@ export default function ProfilePage() {
                   </p>
                 )}
               </div>
+
             </div>
 
             <div className="my-7 border-t border-gray-100" />
@@ -432,9 +547,7 @@ export default function ProfilePage() {
                   className="hive-input"
                   placeholder="React, Python, Figma"
                   value={form.skills}
-                  onChange={(e) =>
-                    handleChange("skills", e.target.value)
-                  }
+                  onChange={(e) => handleChange("skills", e.target.value)}
                 />
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -474,9 +587,7 @@ export default function ProfilePage() {
                   className="hive-input"
                   placeholder="Web development, AI, UI/UX"
                   value={form.interests}
-                  onChange={(e) =>
-                    handleChange("interests", e.target.value)
-                  }
+                  onChange={(e) => handleChange("interests", e.target.value)}
                 />
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -497,6 +608,7 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+
           </div>
         </div>
       </section>
@@ -570,10 +682,14 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        <Link href="/hackathons" className="hive-button hive-button-black w-fit">
+        <Link
+          href="/hackathons"
+          className="hive-button hive-button-black w-fit"
+        >
           Explore hackathons <ArrowRight size={16} />
         </Link>
       </section>
+
     </main>
   );
 }
