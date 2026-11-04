@@ -11,6 +11,7 @@ interface HackathonRow {
   description: string;
   mode: "Online" | "Offline" | "Hybrid";
   location: string;
+  venue_details: string | null;
   start_date: string;
   end_date: string;
   application_deadline: string;
@@ -18,7 +19,6 @@ interface HackathonRow {
   contact_email: string;
   registration_url: string;
   website: string | null;
-  venue_details: string | null;
   created_by: string;
   created_at: string;
 }
@@ -30,20 +30,18 @@ export function useHackathons() {
 
   useEffect(() => {
     const fetchHackathons = async () => {
-      const supabase = createClient();
-
       try {
         setLoading(true);
         setError(null);
+
+        const supabase = createClient();
 
         const { data, error } = await supabase
           .from("hackathons")
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         const rows = (data ?? []) as HackathonRow[];
 
@@ -58,7 +56,10 @@ export function useHackathons() {
           startDate: row.start_date,
           endDate: row.end_date,
           applicationDeadline: row.application_deadline,
-          
+          organizer: row.organizer,
+          contactEmail: row.contact_email,
+          registrationUrl: row.registration_url,
+          website: row.website,
         }));
 
         setHackathons(formattedHackathons);
