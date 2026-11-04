@@ -34,10 +34,10 @@ export default function Navbar() {
       <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-5 sm:px-8">
         <Link href="/profile" className="flex items-center gap-2">
           <Image
-            src="/images/logo.png"
+            src="/images/logo-v2.png"
             alt="HackHive"
-            width={30}
-            height={34}
+            width={52}
+            height={58}
           />
           <span className="hive-heading text-xl">HackHive</span>
         </Link>
@@ -53,6 +53,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => router.push(link.href)}
                 className={`text-xs font-bold transition ${
                   active
                     ? "text-[#b48600]"
@@ -110,7 +111,10 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={() => setMenuOpen(false)}
+                onClick={() => {
+                  setMenuOpen(false);
+                  router.push(link.href);
+                }}
                 className="text-sm font-bold"
               >
                 {link.name}

@@ -12,7 +12,7 @@ export default function AuthLayout({
       <section className="honeycomb-bg relative hidden min-h-screen flex-col justify-between border-r-2 border-black p-9 lg:flex">
         <a href="/" className="flex items-center gap-2">
           <Image
-            src="/images/logo.png"
+            src="/images/logo-v2.png"
             alt="HackHive"
             width={30}
             height={34}
@@ -46,7 +46,7 @@ export default function AuthLayout({
         <div className="w-full max-w-[440px]">
           <div className="mb-8 flex items-center gap-2 lg:hidden">
             <Image
-              src="/images/logo.png"
+              src="/images/logo-v2.png"
               alt="HackHive"
               width={28}
               height={30}

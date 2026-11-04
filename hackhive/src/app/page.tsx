@@ -39,13 +39,15 @@ export default function Home() {
         <header className="flex h-[68px] items-center justify-between border-b border-[#e8e8e8] px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/images/logo.png"
+              src="/images/logo-v2.png"
               alt="HackHive logo"
-              width={30}
-              height={34}
+              width={42}
+              height={48}
               className="object-contain"
             />
-            <span className="hive-heading text-xl">HackHive</span>
+           <span className="origin-left font-['Impact'] text-[26px]  leading-none tracking-[-0.1px] text-black scale-x-[0.99]">
+  HackHive
+</span>
           </Link>
 
           <nav className="hidden items-center gap-8 text-xs font-bold md:flex">
@@ -70,22 +72,20 @@ export default function Home() {
 
             <Link
               href="/signup"
-              className="rounded-full border border-black bg-black px-4 py-2.5 text-xs font-bold text-white shadow-[2px_2px_0_#ffda3d] hover:bg-[#282828]"
-            >
-              Join the hive
-            </Link>
+              className="rounded-full border border-black bg-black px-4 py-2.5 text-xs font-bold !text-white shadow-[2px_2px_0_#ffda3d] hover:bg-[#282828]"
+         >
+               Join the hive
+         </Link>
           </div>
         </header>
 
         {/* HERO */}
 
-        <section className="relative grid min-h-[560px] items-center px-6 py-12 sm:px-12 lg:grid-cols-2 lg:px-12 lg:py-10">
+        <section className="relative grid min-h-[620px] items-center px-6 py-12 sm:px-12 lg:grid-cols-2 lg:px-12 lg:py-10">
           <div className="relative z-10">
-            <div className="mb-5 inline-block -rotate-2 rounded-full border border-black bg-[#fff0a6] px-4 py-2 text-[10px] font-black tracking-[2px]">
-              MADE FOR STUDENT BUILDERS
-            </div>
+            
 
-            <h1 className="hive-heading max-w-[560px] text-[66px] leading-[0.87] sm:text-[82px] lg:text-[94px]">
+            <h1 className="hive-heading max-w-140 font-black text-[66px] leading-[0.87] sm:text-[82px] lg:text-[94px]">
               Find your
               <br />
               people.
@@ -145,17 +145,19 @@ export default function Home() {
 
           {/* HERO IMAGE */}
 
-          <div className="relative mt-10 h-[350px] w-full sm:h-[450px] lg:mt-0 lg:h-[470px]">
-            <Image
-              src="/images/hero-image.png"
-              alt="Bee characters collaborating inside a honeycomb"
-              fill
-              priority
-              className="object-contain"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-        </section>
+{/* HERO IMAGE */}
+
+<div className="relative mt-10 h-[380px] w-full overflow-visible sm:h-[500px] lg:mt-0 lg:h-[560px]">
+  <Image
+    src="/images/hero-image-v2.png"
+    alt="Bee characters collaborating inside a honeycomb"
+    fill
+    priority
+    className="object-contain scale-[1.3] translate-x-[-4%] translate-y-[2%] lg:scale-[1.6] lg:translate-x-[-8%] lg:translate-y-[3%]"
+    sizes="(max-width: 768px) 100vw, 50vw"
+  />
+</div>
+</section>
 
         {/* FEATURES */}
 
@@ -222,7 +224,7 @@ export default function Home() {
         <footer className="flex flex-col items-center justify-between gap-3 border-t border-[#e5e5e5] px-8 py-6 sm:flex-row">
           <div className="flex items-center gap-2">
             <Image
-              src="/images/logo.png"
+              src="/images/logo-v2.png"
               alt=""
               width={23}
               height={26}
