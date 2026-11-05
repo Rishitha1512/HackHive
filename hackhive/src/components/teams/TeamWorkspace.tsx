@@ -54,9 +54,20 @@ function useNow() {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
+    // Schedule the initial update instead of calling setState
+    // synchronously inside the effect.
+    const initialUpdate = setTimeout(() => {
+      setNow(Date.now());
+    }, 0);
+
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearTimeout(initialUpdate);
+      clearInterval(timer);
+    };
   }, []);
 
   return now;
@@ -84,13 +95,18 @@ export default function TeamWorkspace({
 
   /* ---------- Hackathon countdown ---------- */
   const countdown = useMemo(() => {
-    if (now === null || !hackathon.startDate || !hackathon.endDate) return null;
+    if (now === null || !hackathon.startDate || !hackathon.endDate) {
+      return null;
+    }
 
     const start = new Date(`${hackathon.startDate}T00:00:00`).getTime();
     const end = new Date(`${hackathon.endDate}T23:59:59`).getTime();
+
     if (Number.isNaN(start) || Number.isNaN(end)) return null;
 
-    if (now > end) return { phase: "ended" as const, d: 0, h: 0, m: 0 };
+    if (now > end) {
+      return { phase: "ended" as const, d: 0, h: 0, m: 0 };
+    }
 
     const phase = now < start ? ("upcoming" as const) : ("live" as const);
     const diff = (phase === "upcoming" ? start : end) - now;
@@ -107,12 +123,16 @@ export default function TeamWorkspace({
   const deadlineLabel = useMemo(() => {
     if (now === null || !team.recruitmentDeadline) return null;
 
-    const end = new Date(`${team.recruitmentDeadline}T23:59:59`).getTime();
+    const end = new Date(
+      `${team.recruitmentDeadline}T23:59:59`
+    ).getTime();
+
     if (Number.isNaN(end)) return null;
 
     if (end < now) return { text: "Closed", open: false };
 
     const days = Math.ceil((end - now) / DAY);
+
     return {
       text: days <= 1 ? "Last day" : `${days} days left`,
       open: true,
@@ -136,6 +156,7 @@ export default function TeamWorkspace({
 
   const description =
     hackathon.description || "No hackathon description available.";
+
   const longDescription = description.length > 180;
 
   return (
@@ -199,12 +220,15 @@ export default function TeamWorkspace({
                 <Chip icon={<CalendarDays size={14} />}>
                   {formatDate(hackathon.startDate)}
                 </Chip>
+
                 <Chip icon={<Clock size={14} />}>
                   {formatDate(hackathon.endDate)}
                 </Chip>
+
                 <Chip icon={<MapPin size={14} />}>
                   {hackathon.location || "Not specified"}
                 </Chip>
+
                 <Chip icon={<Globe size={14} />}>
                   {hackathon.mode || "Not specified"}
                 </Chip>
@@ -241,6 +265,7 @@ export default function TeamWorkspace({
           >
             Hive
           </TabButton>
+
           <TabButton
             active={tab === "chat"}
             onClick={() => setTab("chat")}
@@ -254,7 +279,9 @@ export default function TeamWorkspace({
         <div className="grid gap-5 lg:grid-cols-[minmax(320px,400px)_1fr] lg:items-start">
           {/* LEFT: team + members */}
           <div
-            className={`space-y-5 ${tab === "chat" ? "hidden" : "block"} lg:block`}
+            className={`space-y-5 ${
+              tab === "chat" ? "hidden" : "block"
+            } lg:block`}
           >
             {/* Team overview */}
             <section className="rounded-2xl border-2 border-[#0e141b] bg-white p-4 shadow-[4px_4px_0px_#0e141b]">
@@ -280,6 +307,7 @@ export default function TeamWorkspace({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff3b0]">
                     <Building2 size={17} />
                   </div>
+
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-gray-500">
                       University
@@ -294,6 +322,7 @@ export default function TeamWorkspace({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff3b0]">
                     <CalendarDays size={17} />
                   </div>
+
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-gray-500">
                       Recruitment deadline
@@ -319,7 +348,9 @@ export default function TeamWorkspace({
 
               <div className="mt-4 border-t border-gray-200 pt-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold">Skills we&apos;re looking for</p>
+                  <p className="text-sm font-bold">
+                    Skills we&apos;re looking for
+                  </p>
 
                   {team.requiredSkills.length > 0 && (
                     <p className="text-xs font-semibold text-gray-500">
@@ -401,7 +432,9 @@ function Tile({ value, label }: { value: number; label: string }) {
       <p className="text-2xl font-black tabular-nums leading-none">
         {String(value).padStart(2, "0")}
       </p>
-      <p className="mt-1 text-[10px] font-semibold text-[#fff3b0]">{label}</p>
+      <p className="mt-1 text-[10px] font-semibold text-[#fff3b0]">
+        {label}
+      </p>
     </div>
   );
 }
