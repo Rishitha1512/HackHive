@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    console.error("OAuth callback error:", error.message);
+    console.error("OAuth callback error:", error);
+    console.error("Underlying fetch error:", (error as any).cause);
+    console.dir(error, { depth: null });
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 

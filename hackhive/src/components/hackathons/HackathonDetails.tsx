@@ -1,7 +1,9 @@
-
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -18,10 +20,12 @@ import {
 
 import type { Hackathon } from "@/types/hackathon";
 import type { Team } from "@/types/team";
+import type { Application, ApplicationStatus } from "@/types/application";
 
 import { useProfile } from "@/hooks/useProfile";
 import { sortTeamsByMatch } from "@/lib/matching";
 import TeamCard from "@/components/teams/TeamCard";
+import { createClient } from "@/lib/supabase/client";
 
 interface HackathonDetailsProps {
   hackathon: Hackathon;
@@ -42,20 +46,174 @@ export default function HackathonDetails({
   hackathon,
   teams,
 }: HackathonDetailsProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
   const {
     profile,
     loading: profileLoading,
     error: profileError,
   } = useProfile();
 
-  // Calculate skill matches and sort teams from highest to lowest.
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [applyError, setApplyError] = useState("");
+  const [isApplying, setIsApplying] = useState(false);
+
+  const profileId = profile?.id;
+
+  const hasCreatedTeamInHackathon = Boolean(
+    profileId &&
+      teams.some((team) => team.createdBy === profileId)
+  );
+
+  // Load this student's applications from Supabase.
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadApplications() {
+      if (!profileId) {
+        if (isMounted) setApplications([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("applications")
+        .select(
+          "id, team_id, hackathon_id, applicant_id, status, created_at, updated_at"
+        )
+        .eq("applicant_id", profileId);
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("Error loading applications:", error.message);
+        setApplyError("Unable to load your applications. Please refresh.");
+        return;
+      }
+
+      const formattedApplications: Application[] = (data ?? []).map(
+        (application) => ({
+          id: application.id,
+          teamId: application.team_id,
+          hackathonId: application.hackathon_id,
+          applicantId: application.applicant_id,
+          status: application.status as ApplicationStatus,
+          createdAt: application.created_at,
+          updatedAt: application.updated_at,
+        })
+      );
+
+      setApplications(formattedApplications);
+    }
+
+    loadApplications();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profileId, supabase]);
+
+  // Calculate skill matches.
   const rankedTeams = profile
     ? sortTeamsByMatch(teams, profile.skills ?? [])
     : [];
 
+  async function handleApply(team: Team) {
+    if (isApplying) return;
+
+    if (!profileId) {
+      setApplyError("Please log in to apply to a team.");
+      return;
+    }
+
+    // A team creator cannot apply to another team
+    // under the same hackathon.
+    const alreadyCreatedTeam = teams.some(
+      (existingTeam) => existingTeam.createdBy === profileId
+    );
+
+    if (alreadyCreatedTeam) {
+      setApplyError(
+        "You have already created a team for this hackathon. You cannot apply to another team."
+      );
+      return;
+    }
+
+    // Prevent another application if one already exists.
+    const alreadyApplied = applications.some(
+      (application) => application.teamId === team.id
+    );
+
+    if (alreadyApplied) {
+      setApplyError("You have already applied to this team.");
+      return;
+    }
+
+    // Check the active application limit before sending the request.
+    const activeApplications = applications.filter(
+      (application) =>
+        application.status === "pending" ||
+        application.status === "accepted"
+    );
+
+    if (activeApplications.length >= 5) {
+      setApplyError(
+        "You have reached the maximum limit of 5 active applications."
+      );
+      return;
+    }
+
+    setApplyError("");
+    setIsApplying(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("applications")
+        .insert({
+          team_id: team.id,
+          hackathon_id: hackathon.id,
+        })
+        .select(
+          "id, team_id, hackathon_id, applicant_id, status, created_at, updated_at"
+        )
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const newApplication: Application = {
+        id: data.id,
+        teamId: data.team_id,
+        hackathonId: data.hackathon_id,
+        applicantId: data.applicant_id,
+        status: data.status as ApplicationStatus,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+
+      setApplications((previous) => [
+        ...previous,
+        newApplication,
+      ]);
+
+      router.push("/applications");
+    } catch (error) {
+      console.error("Application submission error:", error);
+
+      setApplyError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while applying."
+      );
+    } finally {
+      setIsApplying(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#fffdf5]">
-      {/* Yellow hero */}
+      {/* Hero */}
       <section className="border-b-2 border-black bg-[#ffda3d]">
         <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8">
           <Link
@@ -108,7 +266,7 @@ export default function HackathonDetails({
               </p>
             </section>
 
-            {/* Dates */}
+            {/* Important dates */}
             <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
               <h2 className="hive-heading text-2xl">
                 Important dates
@@ -171,6 +329,7 @@ export default function HackathonDetails({
                   <p className="text-sm font-extrabold">
                     {hackathon.location}
                   </p>
+
                   {hackathon.venueDetails && (
                     <p className="mt-2 text-sm leading-6 text-gray-500">
                       {hackathon.venueDetails}
@@ -272,7 +431,7 @@ export default function HackathonDetails({
           </aside>
         </div>
 
-        {/* Teams section */}
+        {/* Teams */}
         <section className="mt-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -336,9 +495,34 @@ export default function HackathonDetails({
             </div>
           ) : (
             <div className="mt-8 flex flex-col gap-5">
-              {rankedTeams.map((team) => (
-                <TeamCard key={team.id} team={team} />
-              ))}
+              {applyError && (
+                <div className="rounded-xl border-2 border-red-500 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                  {applyError}
+                </div>
+              )}
+
+              {rankedTeams.map((team) => {
+                const hasApplied = applications.some(
+                  (application) => application.teamId === team.id
+                );
+
+                return (
+                  <TeamCard
+                    key={team.id}
+                    team={team}
+                    currentUserId={profile.id}
+                    hasApplied={hasApplied}
+                    hasCreatedTeamInHackathon={hasCreatedTeamInHackathon}
+                    onApply={handleApply}
+                  />
+                );
+              })}
+
+              {isApplying && (
+                <p className="text-center text-sm font-bold text-gray-500">
+                  Submitting your application...
+                </p>
+              )}
             </div>
           )}
         </section>

@@ -2,12 +2,25 @@
 import type { Team } from "@/types/team";
 import type { TeamMatch } from "@/lib/matching";
 import MatchScore from "./MatchScore";
+import { Check, UserPlus, Users, ShieldCheck } from "lucide-react";
 
 interface TeamCardProps {
   team: Team & TeamMatch;
+  currentUserId: string;
+  hasApplied: boolean;
+  hasCreatedTeamInHackathon: boolean;
+  onApply: (team: Team) => void;
 }
 
-export default function TeamCard({ team }: TeamCardProps) {
+export default function TeamCard({
+  team,
+  currentUserId,
+  hasApplied,
+  hasCreatedTeamInHackathon,
+  onApply,
+}: TeamCardProps) {
+  const isOwnTeam = team.createdBy === currentUserId;
+
   return (
     <article className="w-full rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000] transition-transform hover:-translate-y-1">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -50,16 +63,12 @@ export default function TeamCard({ team }: TeamCardProps) {
 
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <p>
-            <span className="font-bold text-green-700">
-              Matched: 
-            </span>
+            <span className="font-bold text-green-700">Matched: </span>
             {team.matchedSkills.length}
           </p>
 
           <p>
-            <span className="font-bold text-red-600">
-              Missing: 
-            </span>
+            <span className="font-bold text-red-600">Missing: </span>
             {team.missingSkills.length}
           </p>
         </div>
@@ -68,6 +77,46 @@ export default function TeamCard({ team }: TeamCardProps) {
           <span>👥 Max size: {team.maxTeamSize}</span>
           <span>📅 Recruitment deadline: {team.recruitmentDeadline}</span>
         </div>
+      </div>
+
+      <div className="mt-5 border-t border-gray-200 pt-4">
+        {isOwnTeam ? (
+          <button
+            type="button"
+            disabled
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-gray-100 px-4 py-3 text-sm font-bold text-gray-600"
+          >
+            <Users size={18} />
+            Your Team
+          </button>
+        ) : hasCreatedTeamInHackathon ? (
+          <button
+            type="button"
+            disabled
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-gray-100 px-4 py-3 text-sm font-bold text-gray-500"
+          >
+            <ShieldCheck size={18} />
+            You already created a team for this hackathon
+          </button>
+        ) : hasApplied ? (
+          <button
+            type="button"
+            disabled
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-green-100 px-4 py-3 text-sm font-bold text-green-800"
+          >
+            <Check size={18} />
+            Applied
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onApply(team)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-4 py-3 text-sm font-extrabold text-[#223141] shadow-[3px_3px_0px_#000] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+          >
+            <UserPlus size={18} />
+            Apply to Join
+          </button>
+        )}
       </div>
     </article>
   );
