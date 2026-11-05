@@ -7,5 +7,6 @@ export interface Team {
   maxTeamSize: number;
   requiredSkills: string[];
   recruitmentDeadline: string;
+  createdBy: string;
   createdAt: string;
 }

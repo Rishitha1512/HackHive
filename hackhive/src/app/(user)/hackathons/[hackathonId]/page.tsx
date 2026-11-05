@@ -41,7 +41,7 @@ export default function HackathonDetailsPage() {
       const { data, error } = await supabase
         .from("teams")
         .select(
-          "id, hackathon_id, university, name, description, max_team_size, required_skills, recruitment_deadline, created_at"
+          "id, hackathon_id, university, name, description, max_team_size, required_skills, recruitment_deadline, created_by, created_at"
         )
         .eq("hackathon_id", hackathonId)
         .order("created_at", { ascending: false });
@@ -62,6 +62,7 @@ export default function HackathonDetailsPage() {
           maxTeamSize: team.max_team_size,
           requiredSkills: team.required_skills ?? [],
           recruitmentDeadline: team.recruitment_deadline,
+          createdBy: team.created_by,
           createdAt: team.created_at,
         }));
 
