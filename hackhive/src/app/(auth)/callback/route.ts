@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,8 +15,6 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("OAuth callback error:", error);
-    console.error("Underlying fetch error:", (error as any).cause);
-    console.dir(error, { depth: null });
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 

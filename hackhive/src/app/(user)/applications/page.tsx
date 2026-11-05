@@ -67,7 +67,18 @@ type ApplicantProfile = {
   skills: string[];
   avatar_url: string | null;
 };
-
+type ReceivedApplicantRow = {
+  application_id: string;
+  team_id: string;
+  hackathon_id: string;
+  applicant_id: string;
+  status: ApplicationStatus;
+  applied_at: string;
+  full_name: string;
+  university: string;
+  skills: string[] | null;
+  avatar_url: string | null;
+};
 type Tab = "my-applications" | "received";
 
 type DisplayApplicationStatus =
@@ -345,7 +356,7 @@ export default function ApplicationsPage() {
 
         // The RPC returns only pending/accepted applications
         // for teams created by the logged-in user.
-        const receivedRows = receivedResult.data ?? [];
+        const receivedRows = (receivedResult.data ?? []) as ReceivedApplicantRow[];
 
         const receivedApplicationRows: Application[] = receivedRows.map(
           (application) => ({
