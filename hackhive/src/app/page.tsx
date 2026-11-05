@@ -36,7 +36,7 @@ export default function Home() {
       <div className="mx-auto max-w-[1240px] overflow-hidden rounded-[24px] border-[2px] border-black bg-white">
         {/* NAVBAR */}
 
-        <header className="flex h-[68px] items-center justify-between border-b border-[#e8e8e8] px-5 sm:px-8">
+        <header className="relative z-20 flex h-[68px] items-center justify-between border-b border-[#e8e8e8] bg-white px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
             <Image
               src="/images/logo-v2.png"
@@ -116,44 +116,19 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="mt-9 hidden max-w-[500px] border-t border-[#ddd] pt-5 sm:block">
-              <div className="flex items-center gap-4">
-                <div className="flex -space-x-2">
-                  {["A", "M", "R", "K"].map((letter, index) => (
-                    <div
-                      key={letter}
-                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-black text-xs font-bold ${
-                        index % 2 === 0 ? "bg-[#ffda3d]" : "bg-[#fff0a6]"
-                      }`}
-                    >
-                      {letter}
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <p className="text-xs font-bold">
-                    Designers, developers, dreamers.
-                  </p>
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Everyone has a place in the hive.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* HERO IMAGE */}
 
 {/* HERO IMAGE */}
 
-<div className="relative mt-10 h-[380px] w-full overflow-visible sm:h-[500px] lg:mt-0 lg:h-[560px]">
+<div className="relative z-0 mt-10 h-[380px] w-full overflow-visible sm:h-[500px] lg:mt-0 lg:h-[560px]">
   <Image
     src="/images/hero-image-v2.png"
     alt="Bee characters collaborating inside a honeycomb"
     fill
     priority
-    className="object-contain scale-[1.3] translate-x-[-4%] translate-y-[2%] lg:scale-[1.6] lg:translate-x-[-8%] lg:translate-y-[3%]"
+    className="pointer-events-none object-contain scale-[1.3] translate-x-[-4%] translate-y-[2%] lg:scale-[1.6] lg:translate-x-[-8%] lg:translate-y-[3%]"
     sizes="(max-width: 768px) 100vw, 50vw"
   />
 </div>

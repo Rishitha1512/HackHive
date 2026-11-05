@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -8,39 +7,59 @@ import { createClient } from "@/lib/supabase/client";
 
 import {
   ArrowRight,
-  ArrowUpRight,
-  CalendarDays,
+  Check,
   Edit3,
   ExternalLink,
   GraduationCap,
+  Mail,
   MapPin,
+  Pencil,
   Save,
   Sparkles,
   Trophy,
   X,
-  Pencil,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 
-const participatedHackathons = [
-  {
-    id: 1,
-    name: "CodeSprint 2026",
-    university: "ABC University",
-    date: "August 12–14, 2026",
-    result: "Finalist",
-    color: "bg-[#fff0ae]",
-  },
-  {
-    id: 2,
-    name: "InnovateX",
-    university: "XYZ Institute",
-    date: "June 20–21, 2026",
-    result: "Participant",
-    color: "bg-[#e8edff]",
-  },
-];
+/* ---------- helpers ---------- */
+
+function useCountUp(target: number, duration = 900) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    let frame: number;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+
+  return value;
+}
+
+const HONEYCOMB =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34L28 66zM28 100L0 84V50l28-16 28 16v34l-28 16z' fill='none' stroke='%23000' stroke-opacity='.09' stroke-width='2'/%3E%3C/svg%3E\")";
+
+const HONEYCOMB_YELLOW = HONEYCOMB.replace("%23000", "%23ffda3d").replace(
+  ".09",
+  ".14"
+);
+
+const pop = (delay: number) => ({ "--d": `${delay}ms` } as React.CSSProperties);
+
+const splitList = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth();
@@ -53,6 +72,10 @@ export default function ProfilePage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -64,19 +87,62 @@ export default function ProfilePage() {
     githubOrPortfolio: "",
   });
 
+  const resetForm = () => {
+    if (!user) return;
+    setForm({
+      fullName: user.fullName,
+      university: user.university,
+      location: user.location,
+      bio: user.bio,
+      skills: user.skills.join(", "),
+      interests: user.interests.join(", "),
+      githubOrPortfolio: user.githubOrPortfolio,
+    });
+  };
+
   useEffect(() => {
-    if (user) {
-      setForm({
-        fullName: user.fullName,
-        university: user.university,
-        location: user.location,
-        bio: user.bio,
-        skills: user.skills.join(", "),
-        interests: user.interests.join(", "),
-        githubOrPortfolio: user.githubOrPortfolio,
-      });
-    }
+    resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const openEditor = () => {
+    resetForm();
+    setEditing(true);
+  };
+
+  const closeEditor = () => {
+    if (saving) return;
+    resetForm();
+    setEditing(false);
+  };
+
+  // Modal: lock page scroll + close on Escape.
+  useEffect(() => {
+    if (!editing) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !saving) {
+        resetForm();
+        setEditing(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, saving]);
 
   const handleChange = (field: string, value: string) => {
     setForm((previous) => ({
@@ -94,13 +160,13 @@ export default function ProfilePage() {
     if (!file || !user) return;
 
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      alert("Please select a JPG, PNG or WEBP image.");
+      setToast({ message: "Please select a JPG, PNG or WEBP image.", type: "error" });
       event.target.value = "";
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image size must be less than 2 MB.");
+      setToast({ message: "Image size must be less than 2 MB.", type: "error" });
       event.target.value = "";
       return;
     }
@@ -111,14 +177,10 @@ export default function ProfilePage() {
       setUploadingPicture(true);
       setPreviewUrl(objectUrl);
 
-      const safeFileName = file.name.replace(
-        /[^a-zA-Z0-9._-]/g,
-        "_"
-      );
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
       const filePath = `${user.id}/${Date.now()}-${safeFileName}`;
 
-      // Upload image.
       const { error: uploadError } = await supabase.storage
         .from("profile-pictures")
         .upload(filePath, file, {
@@ -130,25 +192,25 @@ export default function ProfilePage() {
         throw uploadError;
       }
 
-      // Get public image URL.
       const { data } = supabase.storage
         .from("profile-pictures")
         .getPublicUrl(filePath);
 
-      // Save URL in Supabase profiles table.
       await updateProfile({
         profilePicture: data.publicUrl,
       });
 
-      alert("Profile picture updated successfully!");
+      setToast({ message: "Profile picture updated!", type: "success" });
     } catch (error) {
       console.error("Profile picture upload failed:", error);
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Could not upload profile picture."
-      );
+      setToast({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not upload profile picture.",
+        type: "error",
+      });
     } finally {
       URL.revokeObjectURL(objectUrl);
       setPreviewUrl("");
@@ -158,7 +220,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Save other profile information.
+  // Save profile information.
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -168,528 +230,680 @@ export default function ProfilePage() {
         university: form.university.trim(),
         location: form.location.trim(),
         bio: form.bio.trim(),
-        skills: form.skills
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        interests: form.interests
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        skills: splitList(form.skills),
+        interests: splitList(form.interests),
         githubOrPortfolio: form.githubOrPortfolio.trim(),
       });
 
       setEditing(false);
-      alert("Profile updated successfully!");
+      setToast({ message: "Profile updated successfully!", type: "success" });
     } catch (error) {
       console.error("Profile update failed:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Could not update profile."
-      );
+      setToast({
+        message:
+          error instanceof Error ? error.message : "Could not update profile.",
+        type: "error",
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  const completionFields = user
+    ? [
+        user.fullName,
+        user.university,
+        user.location,
+        user.bio,
+        user.skills.length > 0,
+        user.interests.length > 0,
+        user.githubOrPortfolio,
+      ]
+    : [];
+
+  const completion = completionFields.length
+    ? Math.round(
+        (completionFields.filter(Boolean).length / completionFields.length) *
+          100
+      )
+    : 0;
+
+  const animatedCompletion = useCountUp(completion, 1100);
+
   if (!user) return null;
 
-  const completionFields = [
-    user.fullName,
-    user.university,
-    user.location,
-    user.bio,
-    user.skills.length > 0,
-    user.interests.length > 0,
-    user.githubOrPortfolio,
-  ];
-
-  const completion = Math.round(
-    (completionFields.filter(Boolean).length / completionFields.length) * 100
-  );
-
   return (
-    <main className="mx-auto max-w-[1280px] px-5 py-8 sm:px-8 lg:py-12">
+    <main className="relative mx-auto max-w-[1280px] px-5 py-8 sm:px-8 lg:py-10">
+      <style>{`
+        @keyframes pf-pop {
+          0%   { opacity: 0; transform: translateY(24px) scale(.92); }
+          60%  { opacity: 1; transform: translateY(-4px) scale(1.02); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes pf-chip {
+          0%   { opacity: 0; transform: scale(.4) rotate(-6deg); }
+          70%  { transform: scale(1.12) rotate(2deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0); }
+        }
+        @keyframes pf-float {
+          0%, 100% { transform: translateY(0) rotate(-4deg); }
+          50%      { transform: translateY(-10px) rotate(4deg); }
+        }
+        @keyframes pf-toast {
+          0%   { opacity: 0; transform: translateX(40px) scale(.9); }
+          70%  { transform: translateX(-4px) scale(1.02); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes pf-wiggle {
+          0%, 100% { transform: rotate(0); }
+          25% { transform: rotate(-8deg); }
+          75% { transform: rotate(8deg); }
+        }
+        @keyframes pf-shine {
+          0%   { transform: translateX(-120%) skewX(-20deg); }
+          100% { transform: translateX(320%) skewX(-20deg); }
+        }
+        @keyframes pf-fade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes pf-modal {
+          0%   { opacity: 0; transform: translateY(40px) scale(.9); }
+          65%  { opacity: 1; transform: translateY(-6px) scale(1.015); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
 
-      {/* WELCOME SECTION */}
+        .pf-pop {
+          opacity: 0;
+          animation: pf-pop .65s cubic-bezier(.34,1.56,.64,1) forwards;
+          animation-delay: var(--d, 0ms);
+        }
+        .pf-chip {
+          opacity: 0;
+          animation: pf-chip .5s cubic-bezier(.34,1.56,.64,1) forwards;
+          animation-delay: var(--d, 0ms);
+        }
+        .pf-card { transition: transform .2s ease, box-shadow .2s ease; }
+        .pf-card:hover {
+          transform: translate(-3px, -3px);
+          box-shadow: 6px 6px 0 #000;
+        }
+        .pf-hex { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+        .pf-hex:hover { transform: scale(1.1) rotate(-3deg); }
+        .pf-chip-hover { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+        .pf-chip-hover:hover { transform: translateY(-3px) rotate(-2deg) scale(1.06); }
+        .pf-float { animation: pf-float 3.6s ease-in-out infinite; }
+        .pf-avatar { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+        .pf-avatar:hover { transform: scale(1.05) rotate(-3deg); }
+        .pf-avatar:hover .pf-pencil { animation: pf-wiggle .5s ease; }
+        .pf-toast { animation: pf-toast .5s cubic-bezier(.34,1.56,.64,1) forwards; }
+        .pf-overlay { animation: pf-fade .2s ease forwards; }
+        .pf-modal { animation: pf-modal .5s cubic-bezier(.34,1.56,.64,1) forwards; }
+        .pf-shine { position: relative; overflow: hidden; }
+        .pf-shine::after {
+          content: "";
+          position: absolute; top: 0; left: 0;
+          width: 35%; height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+          animation: pf-shine 3.2s ease-in-out infinite;
+        }
 
-      <section className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
-          <p className="mb-3 text-[10px] font-black tracking-[3px] text-[#b48600]">
-            YOUR HIVE, YOUR JOURNEY
-          </p>
+        @media (prefers-reduced-motion: reduce) {
+          .pf-pop, .pf-chip, .pf-toast, .pf-overlay, .pf-modal { animation: none; opacity: 1; }
+          .pf-float, .pf-shine::after { animation: none; }
+          .pf-card:hover, .pf-chip-hover:hover, .pf-hex:hover, .pf-avatar:hover { transform: none; }
+        }
+      `}</style>
 
-          <h1 className="hive-heading text-4xl sm:text-5xl">
-            Hey, {user.fullName.split(" ")[0]}!{" "}
-            <span className="inline-block">🐝</span>
-          </h1>
+      {/* TOAST */}
 
-          <p className="mt-3 text-sm text-gray-500">
-            Your next great collaboration starts here.
-          </p>
+      {toast && (
+        <div
+          role="status"
+          className={`pf-toast fixed right-5 top-20 z-[70] flex items-center gap-2 rounded-xl border-2 border-black px-4 py-3 text-xs font-bold shadow-[4px_4px_0_#000] ${
+            toast.type === "success" ? "bg-[#ffda3d]" : "bg-red-200"
+          }`}
+        >
+          {toast.type === "success" ? <Check size={15} /> : <X size={15} />}
+          {toast.message}
         </div>
+      )}
 
-        <Link href="/hackathons" className="hive-button w-fit">
-          Explore hackathons <ArrowRight size={16} />
-        </Link>
-      </section>
+      {/* HIDDEN FILE INPUT */}
 
-      {/* PROFILE COMPLETION */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleProfilePictureChange}
+      />
 
-      <section className="mb-8 grid gap-5 lg:grid-cols-[1fr_300px]">
-        <div className="rounded-2xl border border-black bg-[#ffda3d] p-6 sm:p-8">
-          <div className="flex items-center gap-2 text-xs font-black tracking-wider">
-            <Sparkles size={17} />
-            YOUR PROFILE
-          </div>
+      {/* ============ HERO ============ */}
 
-          <h2 className="hive-heading mt-4 text-3xl sm:text-4xl">
-            Let the hive know you.
-          </h2>
+      <section
+        className="pf-pop relative mb-8 overflow-hidden rounded-[32px] border-2 border-black bg-[#ffda3d] p-6 shadow-[6px_6px_0_#000] sm:p-9"
+        style={{
+          ...pop(0),
+          backgroundImage: HONEYCOMB,
+          backgroundSize: "56px 100px",
+        }}
+      >
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          {/* LEFT */}
 
-          <p className="mt-2 max-w-lg text-sm text-[#514515]">
-            A complete profile helps you find teammates whose skills
-            complement yours.
-          </p>
+          <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:text-left">
+            <div className="pf-avatar relative h-32 w-32 shrink-0">
+              <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-[3px] border-black bg-white text-5xl font-black shadow-[4px_4px_0_#000]">
+                {previewUrl || user.profilePicture ? (
+                  <Image
+                    src={previewUrl || user.profilePicture}
+                    alt={user.fullName}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : (
+                  user.fullName.charAt(0).toUpperCase()
+                )}
+              </div>
 
-          <div className="mt-7">
-            <div className="mb-2 flex items-center justify-between text-xs font-bold">
-              <span>Profile completion</span>
-              <span>{completion}%</span>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPicture}
+                title="Change profile picture"
+                aria-label="Change profile picture"
+                className="pf-pencil absolute -bottom-1 -right-1 z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-black bg-white shadow-[2px_2px_0_#000] transition hover:bg-[#fff2bf] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {uploadingPicture ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
+                ) : (
+                  <Pencil size={15} />
+                )}
+              </button>
             </div>
 
-            <div className="h-2.5 overflow-hidden rounded-full border border-black bg-white/70">
-              <div
-                className="h-full rounded-full bg-black transition-all"
-                style={{ width: `${completion}%` }}
-              />
+            <div>
+              <p className="mb-2 text-[10px] font-black tracking-[3px] text-black/70">
+                YOUR HIVE, YOUR JOURNEY
+              </p>
+
+              <h1 className="hive-heading text-4xl sm:text-5xl">
+                Hey, {user.fullName.split(" ")[0]}!
+              </h1>
+
+              <p className="mt-2 text-sm font-medium text-black/70">
+                Your next great collaboration starts here.
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                {[
+                  {
+                    icon: <GraduationCap size={13} />,
+                    value: user.university,
+                    placeholder: "+ Add university",
+                  },
+                  {
+                    icon: <MapPin size={13} />,
+                    value: user.location,
+                    placeholder: "+ Add location",
+                  },
+                ].map((chip, i) =>
+                  chip.value ? (
+                    <span
+                      key={i}
+                      className="pf-chip pf-chip-hover inline-flex items-center gap-1.5 rounded-full border border-black bg-white px-4 py-2 text-[11px] font-bold shadow-[2px_2px_0_#000]"
+                      style={pop(200 + i * 90)}
+                    >
+                      {chip.icon} {chip.value}
+                    </span>
+                  ) : (
+                    <button
+                      key={i}
+                      onClick={openEditor}
+                      className="pf-chip pf-chip-hover inline-flex items-center gap-1.5 rounded-full border border-dashed border-black bg-white/50 px-4 py-2 text-[11px] font-bold text-black/70 hover:bg-white"
+                      style={pop(200 + i * 90)}
+                    >
+                      {chip.icon} {chip.placeholder}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                {completion < 100 ? (
+                  /* Progress lives inside the button until the profile is 100% complete */
+                  <button
+                    onClick={openEditor}
+                    aria-label={`Complete your profile, currently ${completion}%`}
+                    className="w-[230px] rounded-lg border-2 border-black bg-white px-4 py-2.5 text-left shadow-[3px_3px_0_#000] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  >
+                    <span className="flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-2">
+                        <Edit3 size={14} />
+                        Complete your profile
+                      </span>
+                      <span className="rounded-full bg-[#ffda3d] px-2 py-0.5 text-[10px] font-black">
+                        {animatedCompletion}%
+                      </span>
+                    </span>
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full border border-black bg-[#fff0ae]">
+                      <span
+                        className="block h-full rounded-full bg-black"
+                        style={{ width: `${animatedCompletion}%` }}
+                      />
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={openEditor}
+                    className="flex items-center gap-2 rounded-lg border-2 border-black bg-white px-4 py-2.5 text-xs font-bold shadow-[3px_3px_0_#000] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  >
+                    <Edit3 size={14} />
+                    Edit profile
+                  </button>
+                )}
+
+                <Link href="/hackathons" className="hive-button w-fit">
+                  Explore hackathons <ArrowRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col justify-between rounded-2xl border border-black bg-white p-6">
-          <div>
-            <p className="text-xs font-black tracking-wider text-gray-500">
-              READY TO BUILD?
-            </p>
-
-            <h3 className="hive-heading mt-3 text-3xl">
-              Find your next team.
-            </h3>
-
-            <p className="mt-3 text-xs leading-5 text-gray-500">
-              Discover hackathons and teams that match your skills.
-            </p>
-          </div>
-
-          <Link
-            href="/hackathons"
-            className="mt-6 flex items-center justify-between rounded-xl bg-white px-4 py-3 text-xs font-bold text-white hover:bg-[#ffda3d]"
-          >
-            Discover teams <ArrowUpRight size={16} />
-          </Link>
         </div>
       </section>
 
-      {/* PROFILE DETAILS */}
+      {/* ============ CONTENT ============ */}
 
-      <section className="mb-10">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
+      {/* One horizontal box: About | Skills + Interests | Details */}
+
+      <section
+        className="pf-pop overflow-hidden rounded-[28px] border-2 border-black bg-white shadow-[5px_5px_0_#000]"
+        style={pop(300)}
+      >
+        <div className="grid lg:grid-cols-[1fr_340px]">
+          {/* LEFT COLUMN: About, Superpowers, Interests stacked */}
+          <div className="flex flex-col">
+          {/* ABOUT */}
+
+          <div className="px-6 pt-6 sm:px-7 sm:pt-7">
             <p className="text-[10px] font-black tracking-[2px] text-[#b48600]">
               ABOUT YOU
             </p>
+            <h2 className="hive-heading mb-3 mt-1 text-2xl">The buzz about me</h2>
 
-            <h2 className="hive-heading mt-1 text-3xl">
-              Your profile
-            </h2>
+            <p
+              className={
+                user.bio && user.bio.length <= 90
+                  ? "text-lg font-semibold leading-snug text-black"
+                  : "text-sm leading-7 text-gray-600"
+              }
+            >
+              {user.bio ||
+                "No bio added yet. Tell other builders what you're about!"}
+            </p>
           </div>
 
-          {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-2 rounded-lg border border-black bg-white px-4 py-2.5 text-xs font-bold hover:bg-[#ffda3d]"
-            >
-              <Edit3 size={14} />
-              Edit profile
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setForm({
-                    fullName: user.fullName,
-                    university: user.university,
-                    location: user.location,
-                    bio: user.bio,
-                    skills: user.skills.join(", "),
-                    interests: user.interests.join(", "),
-                    githubOrPortfolio: user.githubOrPortfolio,
-                  });
-                  setEditing(false);
-                }}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-lg border border-black bg-white px-3 py-2 text-xs font-bold"
-              >
-                <X size={14} /> Cancel
-              </button>
+          {/* SUPERPOWERS */}
 
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="hive-button disabled:opacity-60"
-              >
-                <Save size={14} />
-                {saving ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-
-          {/* LEFT PROFILE CARD */}
-
-          <div className="h-fit rounded-2xl border border-black bg-white p-6">
-            <div className="flex flex-col items-center text-center">
-
-              {/* PROFILE PICTURE */}
-
-              <div className="relative h-24 w-24">
-
-                <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-black bg-[#ffda3d] text-3xl font-black">
-
-                  {previewUrl || user.profilePicture ? (
-                    <Image
-                      src={previewUrl || user.profilePicture}
-                      alt={user.fullName}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-                  ) : (
-                    user.fullName.charAt(0).toUpperCase()
-                  )}
-
-                </div>
-
-                {/* HIDDEN FILE INPUT */}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={handleProfilePictureChange}
-                />
-
-                {/* PENCIL BUTTON */}
-
+          <div className="px-6 pt-4 sm:px-7">
+            <h3 className="mb-3 text-[10px] font-black tracking-[2px] text-[#b48600]">
+              SUPERPOWERS
+            </h3>
+            <div className="flex flex-wrap gap-2.5">
+              {user.skills.map((skill, i) => (
+                <span
+                  key={skill}
+                  className="pf-chip pf-chip-hover cursor-default rounded-full border border-black bg-[#ffda3d] px-4 py-2 text-xs font-bold shadow-[2px_2px_0_#000]"
+                  style={pop(450 + i * 70)}
+                >
+                  {skill}
+                </span>
+              ))}
+              {user.skills.length === 0 && (
                 <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPicture}
-                  title="Change profile picture"
-                  aria-label="Change profile picture"
-                  className="absolute -bottom-1 -right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-[#ffda3d] shadow-md transition hover:bg-[#f5c900] disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={openEditor}
+                  className="rounded-full border border-dashed border-black px-4 py-2 text-xs font-bold text-gray-500 transition hover:bg-[#fff2bf]"
                 >
-                  {uploadingPicture ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                  ) : (
-                    <Pencil size={14} />
-                  )}
+                  + Add your first skill
                 </button>
-
-              </div>
-
-              <h3 className="mt-4 text-xl font-black">
-                {user.fullName}
-              </h3>
-
-              <p className="mt-1 text-xs text-gray-500">{user.email}</p>
-
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#fff2bf] px-3 py-1.5 text-[10px] font-bold">
-                <span className="h-2 w-2 rounded-full bg-green-500" />
-                Student member
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-4 border-t border-gray-100 pt-5">
-              <div className="flex items-center gap-3 text-xs">
-                <GraduationCap size={17} className="text-[#b48600]" />
-                <span>{user.university || "University not added"}</span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs">
-                <MapPin size={17} className="text-[#b48600]" />
-                <span>{user.location || "Location not added"}</span>
-              </div>
-
-              {user.githubOrPortfolio && (
-                <a
-                  href={user.githubOrPortfolio}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 break-all text-xs hover:underline"
-                >
-                  <ExternalLink size={17} className="shrink-0 text-[#b48600]" />
-                  GitHub / Portfolio
-                </a>
               )}
             </div>
           </div>
 
-          {/* RIGHT PROFILE FORM */}
+          {/* INTERESTS */}
 
-          <div className="rounded-2xl border border-black bg-white p-6 sm:p-8">
-            <div className="mb-6">
-              <h3 className="text-sm font-black">Personal information</h3>
-              <p className="mt-1 text-xs text-gray-500">
-                Tell other builders a little about yourself.
+          <div className="px-6 pb-6 pt-4 sm:px-7 sm:pb-7">
+            <h3 className="mb-3 text-[10px] font-black tracking-[2px] text-[#b48600]">
+              INTERESTS
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {user.interests.map((interest, i) => (
+                <span
+                  key={interest}
+                  className="pf-chip pf-chip-hover cursor-default rounded-full border border-black bg-[#fff8d6] px-3 py-1.5 text-xs font-semibold"
+                  style={pop(500 + i * 70)}
+                >
+                  {interest}
+                </span>
+              ))}
+              {user.interests.length === 0 && (
+                <button
+                  onClick={openEditor}
+                  className="rounded-full border border-dashed border-black px-4 py-2 text-xs font-bold text-gray-500 transition hover:bg-[#fff2bf]"
+                >
+                  + Add interests
+                </button>
+              )}
+            </div>
+          </div>
+          </div>
+
+          {/* DETAILS */}
+
+          <div
+            className="border-t-2 border-black bg-[#fff8d6] p-6 sm:p-7 lg:border-l-2 lg:border-t-0"
+            style={{
+              backgroundImage: HONEYCOMB,
+              backgroundSize: "56px 100px",
+            }}
+          >
+            <p className="text-[10px] font-black tracking-[2px] text-[#b48600]">
+              DETAILS
+            </p>
+            <h2 className="hive-heading mb-4 mt-1 text-2xl">Find me</h2>
+
+            <ul className="space-y-3.5 text-sm font-semibold">
+              {[
+                {
+                  icon: <GraduationCap size={16} />,
+                  text: user.university || "University not added",
+                },
+                {
+                  icon: <MapPin size={16} />,
+                  text: user.location || "Location not added",
+                },
+                { icon: <Mail size={16} />, text: user.email },
+              ].map((row, i) => (
+                <li
+                  key={i}
+                  className="pf-chip flex items-center gap-3 break-all"
+                  style={pop(450 + i * 80)}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-black bg-[#ffda3d]">
+                    {row.icon}
+                  </span>
+                  {row.text}
+                </li>
+              ))}
+            </ul>
+
+            {user.githubOrPortfolio ? (
+              <a
+                href={user.githubOrPortfolio}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-2.5 text-xs font-black shadow-[3px_3px_0_#000] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-[#ffda3d] hover:shadow-[5px_5px_0_#000]"
+              >
+                <ExternalLink size={14} /> GitHub / Portfolio
+              </a>
+            ) : (
+              <button
+                onClick={openEditor}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-black px-4 py-2.5 text-xs font-bold text-gray-500 transition hover:bg-[#ffda3d]"
+              >
+                + Add portfolio link
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ HACKATHONS STRIP ============ */}
+
+      <section
+        className="pf-pop mt-6 overflow-hidden rounded-[28px] border-2 border-black bg-black p-6 text-white sm:px-8"
+        style={{
+          ...pop(560),
+          backgroundImage: HONEYCOMB_YELLOW,
+          backgroundSize: "56px 100px",
+        }}
+      >
+        <div className="flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffda3d] text-black">
+              <Trophy size={26} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-[2px] text-[#ffda3d]">
+                YOUR JOURNEY SO FAR
+              </p>
+              <h2 className="hive-heading text-2xl text-white sm:text-3xl">
+                Participated hackathons
+              </h2>
+              <p className="mt-1 text-xs text-white/60">
+                Nothing here yet. Your first build is waiting.
               </p>
             </div>
+          </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
+          <Link
+            href="/hackathons"
+            className="pf-shine inline-flex shrink-0 items-center gap-2 rounded-lg border-2 border-[#ffda3d] bg-[#ffda3d] px-4 py-2.5 text-xs font-black text-black transition hover:scale-105"
+          >
+            <Sparkles size={14} /> Find a hackathon
+          </Link>
+        </div>
+      </section>
 
+      {/* ============ EDIT PROFILE MODAL ============ */}
+
+      {editing && (
+        <div
+          className="pf-overlay fixed inset-0 z-[60] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeEditor();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-profile-title"
+            className="pf-modal flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[28px] border-2 border-black bg-white shadow-[8px_8px_0_#ffda3d] sm:rounded-[28px]"
+          >
+            {/* header */}
+            <div
+              className="relative flex items-start justify-between gap-4 border-b-2 border-black bg-[#ffda3d] px-6 py-5"
+              style={{
+                backgroundImage: HONEYCOMB,
+                backgroundSize: "56px 100px",
+              }}
+            >
               <div>
-                <label className="hive-label">Full name</label>
-                {editing ? (
-                  <input
-                    className="hive-input"
-                    value={form.fullName}
-                    onChange={(e) => handleChange("fullName", e.target.value)}
-                  />
-                ) : (
-                  <p className="text-sm font-semibold">{user.fullName}</p>
-                )}
+                <p className="text-[10px] font-black tracking-[3px] text-black/70">
+                  YOUR HIVE CARD
+                </p>
+                <h2 id="edit-profile-title" className="hive-heading text-3xl">
+                  Edit profile
+                </h2>
               </div>
 
-              <div>
-                <label className="hive-label">University</label>
-                {editing ? (
-                  <input
-                    className="hive-input"
-                    value={form.university}
-                    onChange={(e) => handleChange("university", e.target.value)}
-                  />
-                ) : (
-                  <p className="text-sm font-semibold">{user.university}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="hive-label">Location</label>
-                {editing ? (
-                  <input
-                    className="hive-input"
-                    value={form.location}
-                    onChange={(e) => handleChange("location", e.target.value)}
-                  />
-                ) : (
-                  <p className="text-sm font-semibold">{user.location}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="hive-label">Email</label>
-                <p className="text-sm font-semibold">{user.email}</p>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="hive-label">Bio</label>
-
-                {editing ? (
-                  <textarea
-                    rows={3}
-                    className="hive-input resize-none"
-                    placeholder="Tell us about yourself..."
-                    value={form.bio}
-                    onChange={(e) => handleChange("bio", e.target.value)}
-                  />
-                ) : (
-                  <p className="text-sm leading-6 text-gray-600">
-                    {user.bio || "No bio added yet."}
-                  </p>
-                )}
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="hive-label">GitHub / Portfolio URL</label>
-
-                {editing ? (
-                  <input
-                    type="url"
-                    className="hive-input"
-                    value={form.githubOrPortfolio}
-                    onChange={(e) =>
-                      handleChange("githubOrPortfolio", e.target.value)
-                    }
-                  />
-                ) : (
-                  <p className="break-all text-sm font-semibold">
-                    {user.githubOrPortfolio || "Not added"}
-                  </p>
-                )}
-              </div>
-
+              <button
+                onClick={closeEditor}
+                disabled={saving}
+                aria-label="Close"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white transition hover:rotate-90 hover:bg-[#fff2bf] disabled:opacity-50"
+                style={{ transitionDuration: ".25s" }}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div className="my-7 border-t border-gray-100" />
-
-            {/* SKILLS */}
-
-            <div>
-              <h3 className="mb-3 text-sm font-black">My skills</h3>
-
-              {editing ? (
+            {/* body */}
+            <form
+              id="edit-profile-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+              className="grid flex-1 gap-5 overflow-y-auto px-6 py-6 sm:grid-cols-2"
+            >
+              <div>
+                <label className="hive-label" htmlFor="pf-name">
+                  Full name
+                </label>
                 <input
+                  id="pf-name"
+                  autoFocus
+                  className="hive-input"
+                  value={form.fullName}
+                  onChange={(e) => handleChange("fullName", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="hive-label" htmlFor="pf-uni">
+                  University
+                </label>
+                <input
+                  id="pf-uni"
+                  className="hive-input"
+                  value={form.university}
+                  onChange={(e) => handleChange("university", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="hive-label" htmlFor="pf-loc">
+                  Location
+                </label>
+                <input
+                  id="pf-loc"
+                  className="hive-input"
+                  value={form.location}
+                  onChange={(e) => handleChange("location", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="hive-label" htmlFor="pf-link">
+                  GitHub / Portfolio URL
+                </label>
+                <input
+                  id="pf-link"
+                  type="url"
+                  className="hive-input"
+                  placeholder="https://github.com/you"
+                  value={form.githubOrPortfolio}
+                  onChange={(e) =>
+                    handleChange("githubOrPortfolio", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="hive-label" htmlFor="pf-bio">
+                  Bio
+                </label>
+                <textarea
+                  id="pf-bio"
+                  rows={3}
+                  className="hive-input resize-none"
+                  placeholder="Tell us about yourself..."
+                  value={form.bio}
+                  onChange={(e) => handleChange("bio", e.target.value)}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="hive-label" htmlFor="pf-skills">
+                  Skills
+                </label>
+                <input
+                  id="pf-skills"
                   className="hive-input"
                   placeholder="React, Python, Figma"
                   value={form.skills}
                   onChange={(e) => handleChange("skills", e.target.value)}
                 />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {user.skills.map((skill) => (
+                <div className="mt-2 flex min-h-[28px] flex-wrap gap-1.5">
+                  {splitList(form.skills).map((s, i) => (
                     <span
-                      key={skill}
-                      className="rounded-full border border-black bg-[#fff0ae] px-3 py-1.5 text-xs font-bold"
+                      key={`${s}-${i}`}
+                      className="rounded-full border border-black bg-[#ffda3d] px-2.5 py-1 text-[10px] font-bold"
                     >
-                      {skill}
+                      {s}
                     </span>
                   ))}
-
-                  {user.skills.length === 0 && (
-                    <p className="text-xs text-gray-400">
-                      No skills added yet.
-                    </p>
+                  {splitList(form.skills).length === 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      Separate each skill with a comma.
+                    </span>
                   )}
                 </div>
-              )}
+              </div>
 
-              {editing && (
-                <p className="mt-2 text-[10px] text-gray-400">
-                  Separate each skill with a comma.
-                </p>
-              )}
-            </div>
-
-            <div className="my-7 border-t border-gray-100" />
-
-            {/* INTERESTS */}
-
-            <div>
-              <h3 className="mb-3 text-sm font-black">My interests</h3>
-
-              {editing ? (
+              <div className="sm:col-span-2">
+                <label className="hive-label" htmlFor="pf-interests">
+                  Interests
+                </label>
                 <input
+                  id="pf-interests"
                   className="hive-input"
                   placeholder="Web development, AI, UI/UX"
                   value={form.interests}
                   onChange={(e) => handleChange("interests", e.target.value)}
                 />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {user.interests.map((interest) => (
+                <div className="mt-2 flex min-h-[28px] flex-wrap gap-1.5">
+                  {splitList(form.interests).map((s, i) => (
                     <span
-                      key={interest}
-                      className="rounded-full border border-[#ddd] bg-[#f8f7f2] px-3 py-1.5 text-xs"
+                      key={`${s}-${i}`}
+                      className="rounded-full border border-black bg-[#fff8d6] px-2.5 py-1 text-[10px] font-semibold"
                     >
-                      {interest}
+                      {s}
                     </span>
                   ))}
-
-                  {user.interests.length === 0 && (
-                    <p className="text-xs text-gray-400">
-                      No interests added yet.
-                    </p>
+                  {splitList(form.interests).length === 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      Separate each interest with a comma.
+                    </span>
                   )}
                 </div>
-              )}
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* PREVIOUS HACKATHONS */}
-
-      <section className="mb-12">
-        <div className="mb-6 flex items-end justify-between">
-          <div>
-            <p className="text-[10px] font-black tracking-[2px] text-[#b48600]">
-              YOUR JOURNEY SO FAR
-            </p>
-
-            <h2 className="hive-heading mt-1 text-3xl sm:text-4xl">
-              Participated hackathons
-            </h2>
-          </div>
-
-          <span className="hidden rounded-full bg-[#fff0ae] px-3 py-1.5 text-xs font-bold sm:block">
-            {participatedHackathons.length} events
-          </span>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {participatedHackathons.map((hackathon) => (
-            <div
-              key={hackathon.id}
-              className={`rounded-2xl border border-black p-6 ${hackathon.color}`}
-            >
-              <div className="mb-5 flex items-start justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-black bg-white">
-                  <Trophy size={21} />
-                </div>
-
-                <span className="rounded-full border border-black bg-white px-3 py-1 text-[10px] font-bold">
-                  {hackathon.result}
-                </span>
               </div>
+            </form>
 
-              <h3 className="text-xl font-black">{hackathon.name}</h3>
+            {/* footer */}
+            <div className="flex items-center justify-between gap-3 border-t-2 border-black bg-[#fffdf5] px-6 py-4">
+              <span className="hidden text-[10px] text-gray-400 sm:block">
+                Tip: press Esc to close
+              </span>
 
-              <p className="mt-2 flex items-center gap-2 text-xs text-gray-600">
-                <GraduationCap size={14} />
-                {hackathon.university}
-              </p>
+              <div className="ml-auto flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditor}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg border border-black bg-white px-4 py-2.5 text-xs font-bold transition hover:bg-gray-100 disabled:opacity-60"
+                >
+                  <X size={14} /> Cancel
+                </button>
 
-              <p className="mt-2 flex items-center gap-2 text-xs text-gray-600">
-                <CalendarDays size={14} />
-                {hackathon.date}
-              </p>
+                <button
+                  type="submit"
+                  form="edit-profile-form"
+                  disabled={saving}
+                  className="hive-button disabled:opacity-60"
+                >
+                  <Save size={14} />
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+              </div>
             </div>
-          ))}
+          </div>
         </div>
-
-        <p className="mt-4 text-[11px] text-gray-400">
-          These are sample events for the frontend preview. Real
-          participation history will come from the backend later.
-        </p>
-      </section>
-
-      {/* BOTTOM CTA */}
-
-      <section className="flex flex-col justify-between gap-5 rounded-2xl border border-black bg-[#ffda3d] p-7 sm:flex-row sm:items-center sm:p-9">
-        <div>
-          <h2 className="hive-heading text-3xl sm:text-4xl">
-            Ready for your next challenge?
-          </h2>
-
-          <p className="mt-2 text-xs text-[#514515]">
-            Your next team, your next idea, your next big achievement.
-          </p>
-        </div>
-
-        <Link
-          href="/hackathons"
-          className="hive-button hive-button-black w-fit"
-        >
-          Explore hackathons <ArrowRight size={16} />
-        </Link>
-      </section>
-
+      )}
     </main>
   );
 }

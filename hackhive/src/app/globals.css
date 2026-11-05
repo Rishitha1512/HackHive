@@ -89,6 +89,12 @@ a {
 .hive-button-black {
   background: black;
   color: white;
+  box-shadow: none;
+}
+
+.hive-button-black:hover,
+.hive-button-black:active {
+  box-shadow: none;
 }
 
 /* Inputs */
