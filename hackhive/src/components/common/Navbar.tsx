@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { name: "Hackathons", href: "/hackathons" },
-  { name: "My Teams", href: "/my-teams" },
   { name: "Applications", href: "/applications" },
   { name: "Profile", href: "/profile" },
 ];
@@ -42,7 +41,7 @@ export default function Navbar() {
           <span className="hive-heading text-xl">HackHive</span>
         </Link>
 
-        <nav className="hidden items-center gap-7 lg:flex">
+        <nav className="hidden items-center gap-8 lg:flex">
           {navLinks.map((link) => {
             const active =
               pathname === link.href ||

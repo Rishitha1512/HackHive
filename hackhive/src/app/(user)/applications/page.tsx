@@ -1,13 +1,13 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 import {
-  ArrowLeft,
   ArrowUpRight,
+  Ban,
   CalendarDays,
   Check,
   Clock,
@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Info,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { useProfile } from "@/hooks/useProfile";
 import { createClient } from "@/lib/supabase/client";
@@ -73,6 +74,8 @@ type DisplayApplicationStatus =
   | ApplicationStatus
   | "cannot-join";
 
+/* ---------- helpers ---------- */
+
 function formatDate(date: string) {
   if (!date) return "Not specified";
 
@@ -116,6 +119,46 @@ function getStatusStyle(status: DisplayApplicationStatus) {
   }
 }
 
+const STATUS_META: Record<
+  DisplayApplicationStatus,
+  { fill: string; Icon: LucideIcon }
+> = {
+  pending: { fill: "#ffda3d", Icon: Clock },
+  accepted: { fill: "#86efac", Icon: Check },
+  rejected: { fill: "#fca5a5", Icon: X },
+  withdrawn: { fill: "#e5e7eb", Icon: Ban },
+  "cannot-join": { fill: "#fdba74", Icon: Info },
+};
+
+const HEX_CLIP: CSSProperties = {
+  clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)",
+};
+
+// Hexagon with a black outline.
+function Hex({
+  size,
+  fill,
+  children,
+}: {
+  size: number;
+  fill: string;
+  children?: ReactNode;
+}) {
+  return (
+    <span
+      className="inline-block shrink-0 bg-black p-[2.5px]"
+      style={{ ...HEX_CLIP, width: size, height: size * 1.08 }}
+    >
+      <span
+        className="flex h-full w-full items-center justify-center"
+        style={{ ...HEX_CLIP, background: fill }}
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
 function StatusBadge({
   status,
 }: {
@@ -136,6 +179,35 @@ function StatusBadge({
     </span>
   );
 }
+
+function EmptyState({
+  icon,
+  title,
+  text,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white px-5 py-10 text-center">
+      <div className="mx-auto flex w-fit text-gray-400">{icon}</div>
+      <h3 className="hive-heading mt-3 text-xl">{title}</h3>
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-gray-500">{text}</p>
+      {action}
+    </div>
+  );
+}
+
+const primaryButton =
+  "inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-4 py-2.5 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none disabled:cursor-not-allowed disabled:opacity-50";
+
+const secondaryButton =
+  "inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-2.5 text-sm font-extrabold transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+/* ---------- page ---------- */
 
 export default function ApplicationsPage() {
   const { profile, loading: profileLoading } = useProfile();
@@ -485,33 +557,117 @@ export default function ApplicationsPage() {
 
   return (
     <main className="min-h-screen bg-[#fffdf5]">
-      {/* Header */}
-      <section className="border-b-2 border-black bg-[#ffda3d]">
-        <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-          <Link
-            href="/hackathons"
-            className="mb-7 inline-flex items-center gap-2 text-sm font-bold hover:underline"
-          >
-            <ArrowLeft size={17} />
-            Back to hackathons
-          </Link>
+      {/* ================= Hero ================= */}
+      <section className="relative overflow-hidden border-b-2 border-black bg-[#ffda3d]">
+        {/* Honeycomb background */}
+        <svg
+          aria-hidden
+          className="absolute inset-0 h-full w-full opacity-[0.16]"
+        >
+          <defs>
+            <pattern
+              id="apps-comb"
+              width="56"
+              height="97"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z M28 64 L28 97 M56 48 L84 64 M0 48 L-28 64"
+                fill="none"
+                stroke="#000"
+                strokeWidth="2"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#apps-comb)" />
+        </svg>
 
-          <p className="text-xs font-black uppercase tracking-widest">
-            Your HackHive activity
-          </p>
+        <div className="relative mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-x-8 gap-y-6 px-5 py-8 sm:px-8">
+          <div className="min-w-0">
+            <h1 className="hive-heading text-4xl leading-none sm:text-5xl">
+              Applications
+            </h1>
 
-          <h1 className="hive-heading mt-2 text-4xl sm:text-5xl">
-            Applications
-          </h1>
+            <p className="mt-3 max-w-md text-sm leading-6 text-black/70">
+              Your hive&apos;s inbox and outbox: track the teams you&apos;ve
+              applied to and answer the ones knocking on your door.
+            </p>
+          </div>
 
-          <p className="mt-3 max-w-xl text-sm leading-6 text-black/70">
-            Keep track of the teams you're applying to and manage the
-            applications you receive from other students.
-          </p>
+          <div className="flex flex-wrap gap-4">
+            {/* Application slots */}
+            <div className="rounded-2xl border-2 border-black bg-white px-4 py-3 shadow-[4px_4px_0px_#000]">
+              <p className="text-xs font-extrabold text-black/60">
+                Application slots
+              </p>
+
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="flex -space-x-1"
+                  role="img"
+                  aria-label={`${activeApplicationsCount} of ${MAX_ACTIVE_APPLICATIONS} slots used`}
+                >
+                  {Array.from({ length: MAX_ACTIVE_APPLICATIONS }).map(
+                    (_, index) => (
+                      <Hex
+                        key={index}
+                        size={26}
+                        fill={
+                          index < activeApplicationsCount
+                            ? "#ffb800"
+                            : "#ffffff"
+                        }
+                      />
+                    )
+                  )}
+                </div>
+
+                <p className="text-2xl font-black leading-none">
+                  {activeApplicationsCount}
+                  <span className="text-sm text-gray-400">
+                    {" "}/ {MAX_ACTIVE_APPLICATIONS}
+                  </span>
+                </p>
+              </div>
+
+              <p className="mt-2 max-w-[220px] text-[11px] leading-4 text-gray-500">
+                Pending and accepted applications use up a slot.
+              </p>
+            </div>
+
+            {/* Pending received */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("received")}
+              className="rounded-2xl border-2 border-black bg-white px-4 py-3 text-left shadow-[4px_4px_0px_#000] transition hover:-translate-y-0.5"
+            >
+              <p className="text-xs font-extrabold text-black/60">
+                Waiting on you
+              </p>
+
+              <div className="mt-2 flex items-center gap-3">
+                <Hex size={34} fill={pendingReceivedCount > 0 ? "#ffb800" : "#ffffff"}>
+                  <Inbox size={15} />
+                </Hex>
+
+                <p className="text-2xl font-black leading-none">
+                  {pendingReceivedCount}
+                </p>
+              </div>
+
+              <p className="mt-2 max-w-[200px] text-[11px] leading-4 text-gray-500">
+                {pendingReceivedCount === 0
+                  ? "All caught up. Nothing to review."
+                  : pendingReceivedCount === 1
+                    ? "Application to review on your teams."
+                    : "Applications to review on your teams."}
+              </p>
+            </button>
+          </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
         {error && (
           <div
             role="alert"
@@ -524,545 +680,496 @@ export default function ApplicationsPage() {
           </div>
         )}
 
-        {/* Application summary */}
-        <section className="mb-8 grid gap-5 md:grid-cols-2">
-          <div className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000]">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-gray-500">
-                  Active applications
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {activeApplicationsCount}
-                  <span className="text-lg text-gray-400">
-                    {" "}/ {MAX_ACTIVE_APPLICATIONS}
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#ffda3d]">
-                <Send size={23} />
-              </div>
-            </div>
-
-            <div className="mt-5 h-3 overflow-hidden rounded-full border border-black bg-gray-100">
-              <div
-                className="h-full rounded-full bg-[#ffda3d] transition-all"
-                style={{
-                  width: `${Math.min(
-                    (activeApplicationsCount / MAX_ACTIVE_APPLICATIONS) *
-                      100,
-                    100
-                  )}%`,
-                }}
-              />
-            </div>
-
-            <p className="mt-2 text-xs text-gray-500">
-              Pending and accepted applications count toward your limit.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000]">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-gray-500">
-                  Pending received
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {pendingReceivedCount}
-                </p>
-              </div>
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#ffda3d]">
-                <Inbox size={23} />
-              </div>
-            </div>
-
-            <p className="mt-5 text-xs text-gray-500">
-              Applications waiting for your response on teams you created.
-            </p>
-          </div>
-        </section>
-
-        {/* Teams Created By Me */}
-        <section className="mb-10">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Users size={23} />
-                <h2 className="hive-heading text-2xl">
-                  Teams You've Created
-                </h2>
-              </div>
-              <p className="mt-2 text-sm text-gray-500">
-                Open the workspace for any team you've created.
-              </p>
-            </div>
-
-            <span className="rounded-full border-2 border-black bg-[#ffda3d] px-3 py-1 text-xs font-extrabold">
-              {myCreatedTeams.length}{" "}
-              {myCreatedTeams.length === 1 ? "team" : "teams"}
-            </span>
-          </div>
-
-          {myCreatedTeams.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-7 text-center">
-              <Users size={34} className="mx-auto text-gray-400" />
-              <p className="mt-3 font-bold text-[#223141]">
-                You haven't created any teams yet.
-              </p>
-              <p className="mt-1 text-sm text-gray-500">
-                Create a team from a hackathon to see it here.
-              </p>
-              <Link
-                href="/hackathons"
-                className="mt-5 inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] hover:-translate-y-0.5"
-              >
-                Explore hackathons
-                <ArrowUpRight size={16} />
-              </Link>
-            </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              {myCreatedTeams.map((team) => {
-                const hackathon = getHackathon(team.hackathon_id);
-
-                return (
-                  <article
-                    key={team.id}
-                    className="rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000] transition-transform hover:-translate-y-1"
-                  >
-                    <p className="text-xs font-black uppercase tracking-wider text-[#a47b00]">
-                      {hackathon?.title ?? "Hackathon"}
-                    </p>
-
-                    <h3 className="hive-heading mt-2 text-xl">
-                      {team.name}
-                    </h3>
-
-                    <p className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                      <GraduationCap size={17} />
-                      {team.university}
-                    </p>
-
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-gray-600">
-                      {team.description ||
-                        "No team description provided."}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-4 text-xs font-semibold text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Users size={14} />
-                        Max {team.max_team_size} members
-                      </span>
-
-                      {hackathon && (
-                        <span className="flex items-center gap-1">
-                          <CalendarDays size={14} />
-                          {formatDate(hackathon.start_date)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-5 border-t border-gray-200 pt-4">
-                      <Link
-                        href={`/hackathons/${team.hackathon_id}/teams/${team.id}`}
-                        className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition-transform hover:-translate-y-0.5"
-                      >
-                        Go to Team
-                        <ArrowUpRight size={17} />
-                      </Link>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* Tabs */}
-        <div className="mb-8 flex flex-wrap gap-3 border-b-2 border-black pb-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab("my-applications")}
-            className={`inline-flex items-center gap-2 rounded-xl border-2 border-black px-5 py-3 text-sm font-extrabold transition ${
-              activeTab === "my-applications"
-                ? "bg-[#ffda3d] shadow-[3px_3px_0px_#000]"
-                : "bg-white hover:bg-yellow-50"
-            }`}
-          >
-            <Send size={17} />
-            My applications
-            <span className="rounded-full bg-black px-2 py-0.5 text-xs text-white">
-              {myApplications.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("received")}
-            className={`inline-flex items-center gap-2 rounded-xl border-2 border-black px-5 py-3 text-sm font-extrabold transition ${
-              activeTab === "received"
-                ? "bg-[#ffda3d] shadow-[3px_3px_0px_#000]"
-                : "bg-white hover:bg-yellow-50"
-            }`}
-          >
-            <Inbox size={17} />
-            Received applications
-            <span className="rounded-full bg-black px-2 py-0.5 text-xs text-white">
-              {receivedApplications.length}
-            </span>
-          </button>
-        </div>
-
-        {/* My applications */}
-        {activeTab === "my-applications" && (
-          <section>
-            <div className="mb-6">
-              <h2 className="hive-heading text-2xl">
-                Teams you've applied to
-              </h2>
-              <p className="mt-2 text-sm text-gray-500">
-                Track your application status and withdraw pending
-                applications.
-              </p>
-            </div>
-
-            {myApplications.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white px-5 py-16 text-center">
-                <FileText
-                  size={42}
-                  className="mx-auto text-gray-400"
-                />
-                <h3 className="hive-heading mt-4 text-xl">
-                  No applications yet
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Find a team that matches your skills and apply to join!
-                </p>
-                <Link
-                  href="/hackathons"
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000]"
+        <div className="grid items-start gap-8 lg:grid-cols-[1fr_320px]">
+          {/* ================= Main column ================= */}
+          <div className="min-w-0">
+            {/* Tabs */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex rounded-xl border-2 border-black bg-white p-1 shadow-[3px_3px_0px_#000]">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("my-applications")}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-extrabold transition ${
+                    activeTab === "my-applications"
+                      ? "bg-[#ffda3d]"
+                      : "hover:bg-yellow-50"
+                  }`}
                 >
-                  Explore hackathons
-                </Link>
+                  <Send size={16} />
+                  My applications
+                  <span className="rounded-full bg-black px-2 py-0.5 text-xs text-white">
+                    {myApplications.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("received")}
+                  className={`relative inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-extrabold transition ${
+                    activeTab === "received"
+                      ? "bg-[#ffda3d]"
+                      : "hover:bg-yellow-50"
+                  }`}
+                >
+                  <Inbox size={16} />
+                  Received
+                  <span className="rounded-full bg-black px-2 py-0.5 text-xs text-white">
+                    {receivedApplications.length}
+                  </span>
+
+                  {pendingReceivedCount > 0 && activeTab !== "received" && (
+                    <span
+                      title={`${pendingReceivedCount} pending`}
+                      className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-black bg-red-500"
+                    />
+                  )}
+                </button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-5">
-                {myApplications.map((application) => {
-                  const team = getTeam(application.teamId);
-                  const hackathon = getHackathon(application.hackathonId);
 
-                  const cannotJoinAnotherTeam =
-                    application.status === "pending" &&
-                    hasActiveMembershipInAnotherTeam(application.teamId);
-
-                  const displayStatus: DisplayApplicationStatus =
-                    cannotJoinAnotherTeam
-                      ? "cannot-join"
-                      : application.status;
-
-                  return (
-                    <article
-                      key={application.id}
-                      className="rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000] sm:p-6"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-wider text-[#a47b00]">
-                            {hackathon?.title ?? "Hackathon"}
-                          </p>
-
-                          <h3 className="hive-heading mt-2 text-xl">
-                            {team?.name ?? "Team no longer available"}
-                          </h3>
-
-                          <p className="mt-2 text-sm text-gray-500">
-                            {team?.university ?? "University not available"}
-                          </p>
-                        </div>
-
-                        <StatusBadge status={displayStatus} />
-                      </div>
-
-                      <p className="mt-4 text-sm leading-6 text-gray-600">
-                        {team?.description ??
-                          "Team information is currently unavailable."}
-                      </p>
-
-                      {cannotJoinAnotherTeam && (
-                        <div className="mt-4 flex items-start gap-3 rounded-xl border-2 border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
-                          <Info
-                            size={19}
-                            className="mt-0.5 shrink-0"
-                          />
-                          <p className="leading-6">
-                            You have already joined another active team.
-                            You cannot join another team until that
-                            hackathon ends.
-                          </p>
-                        </div>
-                      )}
-
-                      {application.status === "accepted" && (
-                        <div className="mt-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-800">
-                          <Check size={17} />
-                          You are a member of this team.
-                        </div>
-                      )}
-
-                      <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-gray-500">
-                        <span className="flex items-center gap-2">
-                          <CalendarDays size={15} />
-                          Applied {formatDate(application.createdAt)}
-                        </span>
-
-                        {hackathon && (
-                          <span className="flex items-center gap-2">
-                            <Clock size={15} />
-                            Hackathon: {formatDate(hackathon.start_date)}
-                          </span>
-                        )}
-
-                        {team && (
-                          <span className="flex items-center gap-2">
-                            <Users size={15} />
-                            Max {team.max_team_size} members
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-5">
-                        {hackathon && (
-                          <Link
-                            href={`/hackathons/${hackathon.id}`}
-                            className="inline-flex items-center gap-2 rounded-lg border-2 border-black bg-[#ffda3d] px-4 py-2.5 text-xs font-extrabold hover:-translate-y-0.5"
-                          >
-                            View hackathon
-                          </Link>
-                        )}
-
-                        {application.status === "pending" && (
-                          <button
-                            type="button"
-                            disabled={isUpdating === application.id}
-                            onClick={() =>
-                              changeStatus(application.id, "withdrawn")
-                            }
-                            className="inline-flex items-center gap-2 rounded-lg border-2 border-black bg-white px-4 py-2.5 text-xs font-extrabold hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <X size={15} />
-                            {isUpdating === application.id
-                              ? "Withdrawing..."
-                              : "Withdraw application"}
-                          </button>
-                        )}
-
-                        {/* Accepted applicants can enter the team workspace. */}
-                        {application.status === "accepted" && team && (
-                          <Link
-                            href={`/hackathons/${application.hackathonId}/teams/${application.teamId}`}
-                            className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition-transform hover:-translate-y-0.5"
-                          >
-                            Go to Team
-                            <ArrowUpRight size={17} />
-                          </Link>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Received applications */}
-        {activeTab === "received" && (
-          <section>
-            <div className="mb-6">
-              <h2 className="hive-heading text-2xl">
-                Applications to your teams
-              </h2>
-              <p className="mt-2 text-sm text-gray-500">
-                Review applicants and decide who joins your team.
+              <p className="text-xs font-semibold text-gray-500">
+                {activeTab === "my-applications"
+                  ? "Track your status and withdraw pending applications."
+                  : "Review applicants and decide who joins your team."}
               </p>
             </div>
 
-            {receivedApplications.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white px-5 py-16 text-center">
-                <Users
-                  size={42}
-                  className="mx-auto text-gray-400"
-                />
-                <h3 className="hive-heading mt-4 text-xl">
-                  No applications received
-                </h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  When students apply to your teams, their applications
-                  will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-5">
-                {receivedApplications.map((application) => {
-                  const team = getTeam(application.teamId);
-                  const hackathon = getHackathon(application.hackathonId);
-                  const applicant = getApplicant(application.applicantId);
+            {/* ---------- My applications ---------- */}
+            {activeTab === "my-applications" && (
+              <section className="mt-5">
+                {myApplications.length === 0 ? (
+                  <EmptyState
+                    icon={<FileText size={36} />}
+                    title="No applications yet"
+                    text="Your hive is quiet. Find a team that matches your skills and apply to join!"
+                    action={
+                      <Link
+                        href="/hackathons"
+                        className={`${primaryButton} mt-5`}
+                      >
+                        Explore hackathons
+                      </Link>
+                    }
+                  />
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {myApplications.map((application) => {
+                      const team = getTeam(application.teamId);
+                      const hackathon = getHackathon(
+                        application.hackathonId
+                      );
 
-                  return (
-                    <article
-                      key={application.id}
-                      className="rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000] sm:p-6"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-wider text-[#a47b00]">
-                            Application for
-                          </p>
-                          <h3 className="hive-heading mt-2 text-xl">
-                            {team?.name ?? "Your team"}
-                          </h3>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {hackathon?.title ?? "Hackathon"}
-                          </p>
-                        </div>
+                      const cannotJoinAnotherTeam =
+                        application.status === "pending" &&
+                        hasActiveMembershipInAnotherTeam(
+                          application.teamId
+                        );
 
-                        <StatusBadge status={application.status} />
-                      </div>
+                      const displayStatus: DisplayApplicationStatus =
+                        cannotJoinAnotherTeam
+                          ? "cannot-join"
+                          : application.status;
 
-                      <div className="mt-6 rounded-xl border-2 border-gray-200 bg-[#fffdf5] p-4">
-                        <div className="flex items-center gap-3">
-                          {applicant?.avatar_url ? (
-                            <Image
-                              src={applicant.avatar_url}
-                              alt={applicant.full_name}
-                              width={48}
-                              height={48}
-                              className="h-12 w-12 rounded-full border-2 border-black object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-[#ffda3d] text-lg font-black">
-                              {applicant?.full_name
-                                ?.charAt(0)
-                                ?.toUpperCase() ?? "?"}
-                            </div>
-                          )}
+                      const meta =
+                        STATUS_META[displayStatus] ?? STATUS_META.withdrawn;
 
-                          <div>
-                            <h4 className="font-extrabold">
-                              {applicant?.full_name ??
-                                "Applicant profile unavailable"}
-                            </h4>
-                            <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                              <GraduationCap size={14} />
-                              {applicant?.university ??
-                                "University not available"}
-                            </p>
-                          </div>
-                        </div>
+                      return (
+                        <article
+                          key={application.id}
+                          className="rounded-2xl border-2 border-black bg-white p-4 shadow-[4px_4px_0px_#000] sm:p-5"
+                        >
+                          <div className="flex gap-4">
+                            <Hex size={46} fill={meta.fill}>
+                              <meta.Icon size={19} strokeWidth={2.5} />
+                            </Hex>
 
-                        <div className="mt-5">
-                          <p className="text-xs font-black uppercase tracking-wider text-gray-500">
-                            Skills
-                          </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-extrabold text-[#a47b00]">
+                                    {hackathon?.title ?? "Hackathon"}
+                                  </p>
 
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {applicant?.skills?.length ? (
-                              applicant.skills.map((skill) => (
-                                <span
-                                  key={skill}
-                                  className="rounded-full border border-black bg-white px-3 py-1 text-xs font-bold"
-                                >
-                                  {skill}
-                                </span>
-                              ))
-                            ) : (
-                              <p className="text-xs text-gray-500">
-                                No skills added to profile.
+                                  <h3 className="hive-heading text-xl leading-tight">
+                                    {team?.name ??
+                                      "Team no longer available"}
+                                  </h3>
+                                </div>
+
+                                <StatusBadge status={displayStatus} />
+                              </div>
+
+                              <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                                <GraduationCap size={14} />
+                                {team?.university ??
+                                  "University not available"}
                               </p>
+
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">
+                                {team?.description ??
+                                  "Team information is currently unavailable."}
+                              </p>
+
+                              {cannotJoinAnotherTeam && (
+                                <div className="mt-3 flex items-start gap-3 rounded-xl border-2 border-orange-300 bg-orange-50 p-3 text-sm text-orange-900">
+                                  <Info
+                                    size={18}
+                                    className="mt-0.5 shrink-0"
+                                  />
+                                  <p className="leading-6">
+                                    You have already joined another active
+                                    team. You cannot join another team
+                                    until that hackathon ends.
+                                  </p>
+                                </div>
+                              )}
+
+                              {application.status === "accepted" && (
+                                <div className="mt-3 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-800">
+                                  <Check size={17} />
+                                  You are a member of this team.
+                                </div>
+                              )}
+
+                              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-gray-300 pt-3">
+                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-semibold text-gray-500">
+                                  <span className="flex items-center gap-1.5">
+                                    <CalendarDays size={14} />
+                                    Applied{" "}
+                                    {formatDate(application.createdAt)}
+                                  </span>
+
+                                  {hackathon && (
+                                    <span className="flex items-center gap-1.5">
+                                      <Clock size={14} />
+                                      Starts{" "}
+                                      {formatDate(hackathon.start_date)}
+                                    </span>
+                                  )}
+
+                                  {team && (
+                                    <span className="flex items-center gap-1.5">
+                                      <Users size={14} />
+                                      Max {team.max_team_size} members
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {hackathon && (
+                                    <Link
+                                      href={`/hackathons/${hackathon.id}`}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-white px-3 py-2 text-xs font-extrabold hover:bg-yellow-50"
+                                    >
+                                      View hackathon
+                                    </Link>
+                                  )}
+
+                                  {application.status === "pending" && (
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        isUpdating === application.id
+                                      }
+                                      onClick={() =>
+                                        changeStatus(
+                                          application.id,
+                                          "withdrawn"
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-white px-3 py-2 text-xs font-extrabold hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <X size={14} />
+                                      {isUpdating === application.id
+                                        ? "Withdrawing..."
+                                        : "Withdraw"}
+                                    </button>
+                                  )}
+
+                                  {/* Accepted applicants can enter the team workspace. */}
+                                  {application.status === "accepted" &&
+                                    team && (
+                                      <Link
+                                        href={`/hackathons/${application.hackathonId}/teams/${application.teamId}`}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#ffda3d] px-3 py-2 text-xs font-extrabold shadow-[2px_2px_0px_#000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                                      >
+                                        Go to Team
+                                        <ArrowUpRight size={14} />
+                                      </Link>
+                                    )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ---------- Received applications ---------- */}
+            {activeTab === "received" && (
+              <section className="mt-5">
+                {receivedApplications.length === 0 ? (
+                  <EmptyState
+                    icon={<Users size={36} />}
+                    title="No buzz yet"
+                    text="When students apply to your teams, their applications will land here."
+                  />
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {receivedApplications.map((application) => {
+                      const team = getTeam(application.teamId);
+                      const hackathon = getHackathon(
+                        application.hackathonId
+                      );
+                      const applicant = getApplicant(
+                        application.applicantId
+                      );
+
+                      return (
+                        <article
+                          key={application.id}
+                          className="rounded-2xl border-2 border-black bg-white shadow-[4px_4px_0px_#000]"
+                        >
+                          {/* Context strip */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[14px] border-b-2 border-black bg-[#fffdf5] px-4 py-2.5 sm:px-5">
+                            <p className="min-w-0 truncate text-sm">
+                              <span className="text-gray-500">
+                                Applied to{" "}
+                              </span>
+                              <span className="hive-heading text-base">
+                                {team?.name ?? "Your team"}
+                              </span>
+                              <span className="text-gray-500">
+                                {" "}in {hackathon?.title ?? "Hackathon"}
+                              </span>
+                            </p>
+
+                            <StatusBadge status={application.status} />
+                          </div>
+
+                          <div className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
+                            {/* Applicant */}
+                            <div className="flex min-w-0 flex-1 basis-72 gap-3">
+                              {applicant?.avatar_url ? (
+                                <Image
+                                  src={applicant.avatar_url}
+                                  alt={applicant.full_name}
+                                  width={48}
+                                  height={48}
+                                  className="h-12 w-12 shrink-0 rounded-full border-2 border-black object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#ffda3d] text-lg font-black">
+                                  {applicant?.full_name
+                                    ?.charAt(0)
+                                    ?.toUpperCase() ?? "?"}
+                                </div>
+                              )}
+
+                              <div className="min-w-0">
+                                <h4 className="font-extrabold">
+                                  {applicant?.full_name ??
+                                    "Applicant profile unavailable"}
+                                </h4>
+
+                                <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-gray-500">
+                                  <span className="flex items-center gap-1">
+                                    <GraduationCap size={14} />
+                                    {applicant?.university ??
+                                      "University not available"}
+                                  </span>
+
+                                  <span className="flex items-center gap-1">
+                                    <CalendarDays size={14} />
+                                    Applied{" "}
+                                    {formatDate(application.createdAt)}
+                                  </span>
+                                </p>
+
+                                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                  {applicant?.skills?.length ? (
+                                    applicant.skills.map((skill) => (
+                                      <span
+                                        key={skill}
+                                        className="rounded-full border border-black bg-[#fff8d6] px-2.5 py-0.5 text-xs font-bold"
+                                      >
+                                        {skill}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs text-gray-500">
+                                      No skills added to profile.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            {application.status === "pending" && (
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isUpdating === application.id}
+                                  onClick={() =>
+                                    changeStatus(application.id, "accepted")
+                                  }
+                                  className={primaryButton}
+                                >
+                                  <Check size={16} />
+                                  {isUpdating === application.id
+                                    ? "Updating..."
+                                    : "Accept"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isUpdating === application.id}
+                                  onClick={() =>
+                                    changeStatus(application.id, "rejected")
+                                  }
+                                  className={secondaryButton}
+                                >
+                                  <X size={16} />
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+
+                            {application.status === "accepted" && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-800">
+                                  <Check size={16} />
+                                  Accepted
+                                </div>
+
+                                {team && (
+                                  <Link
+                                    href={`/hackathons/${application.hackathonId}/teams/${application.teamId}`}
+                                    className={primaryButton}
+                                  >
+                                    Go to Team
+                                    <ArrowUpRight size={16} />
+                                  </Link>
+                                )}
+                              </div>
                             )}
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">
-                        <CalendarDays size={14} />
-                        Applied {formatDate(application.createdAt)}
-                      </div>
-
-                      {/* Active-team restriction feedback for this applicant. */}
-                      {applicationFeedback?.applicationId === application.id && (
-                        <div
-                          role="alert"
-                          className="mt-4 flex items-start gap-3 rounded-xl border-2 border-orange-300 bg-orange-50 p-4 text-sm text-orange-900"
-                        >
-                          <Info
-                            size={19}
-                            className="mt-0.5 shrink-0"
-                          />
-                          <p className="leading-6">
-                            {applicationFeedback.message}
-                          </p>
-                        </div>
-                      )}
-
-                      {application.status === "pending" && (
-                        <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-5">
-                          <button
-                            type="button"
-                            disabled={isUpdating === application.id}
-                            onClick={() =>
-                              changeStatus(application.id, "accepted")
-                            }
-                            className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Check size={17} />
-                            {isUpdating === application.id
-                              ? "Updating..."
-                              : "Accept application"}
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isUpdating === application.id}
-                            onClick={() =>
-                              changeStatus(application.id, "rejected")
-                            }
-                            className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-white px-5 py-3 text-sm font-extrabold hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <X size={17} />
-                            Reject
-                          </button>
-                        </div>
-                      )}
-
-                      {application.status === "accepted" && (
-                        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-5">
-                          <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm font-bold text-green-800">
-                            <Check size={17} />
-                            This applicant has been accepted.
-                          </div>
-
-                          {team && (
-                            <Link
-                              href={`/hackathons/${application.hackathonId}/teams/${application.teamId}`}
-                              className="inline-flex items-center gap-2 rounded-xl border-2 border-black bg-[#ffda3d] px-5 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition-transform hover:-translate-y-0.5"
+                          {/* Active-team restriction feedback for this applicant. */}
+                          {applicationFeedback?.applicationId ===
+                            application.id && (
+                            <div
+                              role="alert"
+                              className="mx-4 mb-4 flex items-start gap-3 rounded-xl border-2 border-orange-300 bg-orange-50 p-3 text-sm text-orange-900 sm:mx-5 sm:mb-5"
                             >
-                              Go to Team
-                              <ArrowUpRight size={17} />
-                            </Link>
+                              <Info
+                                size={18}
+                                className="mt-0.5 shrink-0"
+                              />
+                              <p className="leading-6">
+                                {applicationFeedback.message}
+                              </p>
+                            </div>
                           )}
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
             )}
-          </section>
-        )}
+          </div>
+
+          {/* ================= Sidebar: teams I created ================= */}
+          <aside className="lg:sticky lg:top-24">
+            <div className="rounded-2xl border-2 border-black bg-white p-4 shadow-[4px_4px_0px_#000]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Users size={20} />
+                  <h2 className="hive-heading text-xl">Your teams</h2>
+                </div>
+
+                <span className="rounded-full border-2 border-black bg-[#ffda3d] px-2.5 py-0.5 text-xs font-extrabold">
+                  {myCreatedTeams.length}
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-gray-500">
+                Jump into the workspace of any team you&apos;ve created.
+              </p>
+
+              {myCreatedTeams.length === 0 ? (
+                <div className="mt-4 rounded-xl border-2 border-dashed border-gray-300 p-4 text-center">
+                  <p className="text-sm font-bold text-[#223141]">
+                    No teams yet
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Create a team from a hackathon and it will show up here.
+                  </p>
+                  <Link
+                    href="/hackathons"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#ffda3d] px-3 py-2 text-xs font-extrabold"
+                  >
+                    Explore hackathons
+                    <ArrowUpRight size={14} />
+                  </Link>
+                </div>
+              ) : (
+                <ul className="mt-4 flex flex-col gap-3">
+                  {myCreatedTeams.map((team) => {
+                    const hackathon = getHackathon(team.hackathon_id);
+
+                    return (
+                      <li
+                        key={team.id}
+                        className="rounded-xl border-2 border-black bg-[#fffdf5] p-3"
+                      >
+                        <p className="truncate text-xs font-extrabold text-[#a47b00]">
+                          {hackathon?.title ?? "Hackathon"}
+                        </p>
+
+                        <h3 className="hive-heading mt-0.5 text-lg leading-tight">
+                          {team.name}
+                        </h3>
+
+                        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <GraduationCap size={13} />
+                            {team.university}
+                          </span>
+
+                          <span className="flex items-center gap-1">
+                            <Users size={13} />
+                            Max {team.max_team_size}
+                          </span>
+
+                          {hackathon && (
+                            <span className="flex items-center gap-1">
+                              <CalendarDays size={13} />
+                              {formatDate(hackathon.start_date)}
+                            </span>
+                          )}
+                        </p>
+
+                        <Link
+                          href={`/hackathons/${team.hackathon_id}/teams/${team.id}`}
+                          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-black bg-[#ffda3d] px-3 py-2 text-xs font-extrabold shadow-[2px_2px_0px_#000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                        >
+                          Go to Team
+                          <ArrowUpRight size={14} />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
     </main>
   );

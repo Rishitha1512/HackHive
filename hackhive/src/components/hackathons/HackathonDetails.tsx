@@ -8,14 +8,10 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CalendarDays,
-  Clock,
-  Globe,
-  Mail,
   MapPin,
-  Users,
   Plus,
-  Building2,
-  ExternalLink,
+  Timer,
+  Users,
 } from "lucide-react";
 
 import type { Hackathon } from "@/types/hackathon";
@@ -32,15 +28,41 @@ interface HackathonDetailsProps {
   teams: Team[];
 }
 
-function formatDate(date: string) {
-  if (!date) return "Not specified";
+/* ---------- helpers ---------- */
 
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+function parseDate(date: string) {
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDate(date: string) {
+  const parsed = parseDate(date);
+  if (!parsed) return "Not specified";
+
+  return parsed.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
+
+function getDurationDays(start: string, end: string) {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  if (!s || !e) return null;
+
+  const days = Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
+  return days > 0 ? days : null;
+}
+
+function scrollToTeams() {
+  document
+    .getElementById("teams-for-hackathon")
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ---------- page ---------- */
 
 export default function HackathonDetails({
   hackathon,
@@ -62,8 +84,7 @@ export default function HackathonDetails({
   const profileId = profile?.id;
 
   const hasCreatedTeamInHackathon = Boolean(
-    profileId &&
-      teams.some((team) => team.createdBy === profileId)
+    profileId && teams.some((team) => team.createdBy === profileId)
   );
 
   // Load this student's applications from Supabase.
@@ -152,8 +173,7 @@ export default function HackathonDetails({
     // Check the active application limit before sending the request.
     const activeApplications = applications.filter(
       (application) =>
-        application.status === "pending" ||
-        application.status === "accepted"
+        application.status === "pending" || application.status === "accepted"
     );
 
     if (activeApplications.length >= 5) {
@@ -192,10 +212,7 @@ export default function HackathonDetails({
         updatedAt: data.updated_at,
       };
 
-      setApplications((previous) => [
-        ...previous,
-        newApplication,
-      ]);
+      setApplications((previous) => [...previous, newApplication]);
 
       router.push("/applications");
     } catch (error) {
@@ -211,199 +228,103 @@ export default function HackathonDetails({
     }
   }
 
+  const duration = getDurationDays(hackathon.startDate, hackathon.endDate);
+
   return (
     <main className="min-h-screen bg-[#fffdf5]">
       {/* Hero */}
-      <section className="border-b-2 border-black bg-[#ffda3d]">
-        <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8">
+      <section className="relative overflow-hidden border-b-2 border-black bg-[#ffda3d]">
+        {/* Honeycomb background */}
+        <svg
+          aria-hidden
+          className="absolute inset-0 h-full w-full opacity-[0.18]"
+        >
+          <defs>
+            <pattern
+              id="hero-comb"
+              width="56"
+              height="97"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z M28 64 L28 97 M56 48 L84 64 M0 48 L-28 64"
+                fill="none"
+                stroke="#000"
+                strokeWidth="2"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hero-comb)" />
+        </svg>
+
+        <div className="relative mx-auto max-w-[1100px] px-5 py-7 sm:px-8">
           <Link
             href="/hackathons"
-            className="mb-8 inline-flex items-center gap-2 text-sm font-bold hover:underline"
+            className="mb-5 inline-flex items-center gap-2 text-sm font-bold hover:underline"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={16} />
             Back to hackathons
           </Link>
 
-          <div className="mb-5 flex flex-wrap gap-2">
-            <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-extrabold uppercase">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border-2 border-black bg-white px-3 py-0.5 text-xs font-extrabold uppercase">
               {hackathon.domain}
             </span>
 
-            <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-extrabold uppercase">
+            <span className="rounded-full border-2 border-black bg-white px-3 py-0.5 text-xs font-extrabold uppercase">
               {hackathon.mode}
             </span>
+
           </div>
 
-          <h1 className="hive-heading max-w-3xl text-4xl leading-tight sm:text-6xl">
+          <h1 className="hive-heading max-w-xl text-3xl leading-[1.1] sm:text-4xl md:text-[2.6rem]">
             {hackathon.title}
           </h1>
 
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm font-bold">
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold">
             <span className="flex items-center gap-2">
-              <MapPin size={17} />
+              <MapPin size={16} />
               {hackathon.location}
             </span>
 
             <span className="flex items-center gap-2">
-              <CalendarDays size={17} />
+              <CalendarDays size={16} />
               {formatDate(hackathon.startDate)} – {formatDate(hackathon.endDate)}
             </span>
+
+            {duration && (
+              <span className="flex items-center gap-2">
+                <Timer size={16} />
+                {duration} {duration === 1 ? "day" : "days"}
+              </span>
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={scrollToTeams}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-2 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition hover:-translate-y-0.5"
+          >
+            <Users size={16} />
+            Find your team
+          </button>
         </div>
       </section>
 
       <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8">
-        <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-          {/* Main information */}
-          <div className="space-y-8">
-            <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
-              <h2 className="hive-heading text-2xl">
-                About this hackathon
-              </h2>
+        <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
+          {/* About */}
+          <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
+            <h2 className="hive-heading text-2xl">About this hackathon</h2>
 
-              <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-gray-600">
-                {hackathon.description}
-              </p>
-            </section>
-
-            {/* Important dates */}
-            <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
-              <h2 className="hive-heading text-2xl">
-                Important dates
-              </h2>
-
-              <div className="mt-6 grid gap-5 sm:grid-cols-2">
-                <div className="flex gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ffda3d]">
-                    <CalendarDays size={20} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-500">
-                      Start date
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold">
-                      {formatDate(hackathon.startDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ffda3d]">
-                    <CalendarDays size={20} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-500">
-                      End date
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold">
-                      {formatDate(hackathon.endDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 sm:col-span-2">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ffda3d]">
-                    <Clock size={20} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-500">
-                      Registration deadline
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold">
-                      {formatDate(hackathon.applicationDeadline)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Location */}
-            <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
-              <h2 className="hive-heading text-2xl">
-                Location and venue
-              </h2>
-
-              <div className="mt-5 flex gap-3">
-                <MapPin size={21} className="shrink-0" />
-                <div>
-                  <p className="text-sm font-extrabold">
-                    {hackathon.location}
-                  </p>
-
-                  {hackathon.venueDetails && (
-                    <p className="mt-2 text-sm leading-6 text-gray-500">
-                      {hackathon.venueDetails}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* Organiser */}
-            <section className="rounded-2xl border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000] sm:p-8">
-              <h2 className="hive-heading text-2xl">
-                Organiser information
-              </h2>
-
-              <div className="mt-5 space-y-4">
-                <div className="flex items-center gap-3">
-                  <Building2 size={20} />
-                  <div>
-                    <p className="text-xs font-bold text-gray-500">
-                      Organised by
-                    </p>
-                    <p className="text-sm font-extrabold">
-                      {hackathon.organizer}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Mail size={20} />
-                  <div>
-                    <p className="text-xs font-bold text-gray-500">
-                      Contact email
-                    </p>
-                    <a
-                      href={`mailto:${hackathon.contactEmail}`}
-                      className="break-all text-sm font-bold text-blue-700 hover:underline"
-                    >
-                      {hackathon.contactEmail}
-                    </a>
-                  </div>
-                </div>
-
-                {hackathon.website && (
-                  <div className="flex items-center gap-3">
-                    <Globe size={20} />
-                    <div>
-                      <p className="text-xs font-bold text-gray-500">
-                        Official website
-                      </p>
-                      <a
-                        href={hackathon.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-all text-sm font-bold text-blue-700 hover:underline"
-                      >
-                        Visit website <ExternalLink size={13} className="inline" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Registration sidebar */}
-          <aside className="h-fit rounded-2xl border-2 border-black bg-[#ffda3d] p-6 shadow-[4px_4px_0px_#000]">
-            <p className="text-xs font-black uppercase tracking-widest">
-              Ready to participate?
+            <p className="mt-5 max-w-[68ch] whitespace-pre-wrap text-sm leading-7 text-gray-600">
+              {hackathon.description}
             </p>
+          </section>
 
-            <h2 className="hive-heading mt-3 text-2xl">
-              Join the action.
-            </h2>
+          {/* Registration */}
+          <aside className="rounded-2xl border-2 border-black bg-[#ffda3d] p-6 shadow-[4px_4px_0px_#000] lg:sticky lg:top-24">
+            <h2 className="hive-heading text-2xl">Join the action.</h2>
 
             <p className="mt-3 text-sm leading-6 text-black/70">
               Register for this hackathon and turn your ideas into something
@@ -414,7 +335,7 @@ export default function HackathonDetails({
               href={hackathon.registrationUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-3 text-sm font-extrabold shadow-[3px_3px_0px_#000] transition hover:-translate-y-1"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-3 text-sm font-extrabold text-black shadow-[3px_3px_0px_#000] transition hover:-translate-y-1"
             >
               Register now
               <ArrowUpRight size={17} />
@@ -432,14 +353,10 @@ export default function HackathonDetails({
         </div>
 
         {/* Teams */}
-        <section className="mt-14">
+        <section id="teams-for-hackathon" className="mt-14 scroll-mt-24">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-widest text-[#b48600]">
-                Find your people
-              </p>
-
-              <h2 className="hive-heading mt-2 text-3xl sm:text-4xl">
+              <h2 className="hive-heading text-3xl sm:text-4xl">
                 Teams for this hackathon
               </h2>
 
@@ -462,9 +379,7 @@ export default function HackathonDetails({
             <div className="mt-8 rounded-2xl border-2 border-dashed border-gray-300 bg-white px-5 py-14 text-center">
               <Users size={38} className="mx-auto text-gray-400" />
 
-              <h3 className="hive-heading mt-4 text-xl">
-                No teams yet!
-              </h3>
+              <h3 className="hive-heading mt-4 text-xl">No teams yet!</h3>
 
               <p className="mt-2 text-sm text-gray-500">
                 Be the first to create a team for this hackathon.
@@ -490,7 +405,8 @@ export default function HackathonDetails({
                 Unable to load your profile skills.
               </p>
               <p className="mt-2 text-sm text-gray-500">
-                {profileError || "Please complete your profile to see team matches."}
+                {profileError ||
+                  "Please complete your profile to see team matches."}
               </p>
             </div>
           ) : (
