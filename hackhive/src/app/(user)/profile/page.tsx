@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import GitHubProjects from "@/components/profile/GitHubProjects";
 
 import {
   ArrowRight,
@@ -660,6 +661,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+
+      {/* ============ GITHUB PROJECTS ============ */}
+      <GitHubProjects />
 
       {/* ============ HACKATHONS STRIP ============ */}
 
